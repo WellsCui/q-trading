@@ -1,0 +1,53 @@
+{
+  "short_ma_period": 30,
+  "long_ma_period": 120,
+  "check_interval_minutes": 15,
+  "dry_run": true,
+  "enable_notifications": false,
+  "data_lookback_days": 200,
+  "trading_hours_only": true,
+  "market_open_hour": 9,
+  "market_close_hour": 16,
+  
+  "_comment_ib": "Interactive Brokers settings",
+  "use_interactive_brokers": false,
+  "ib_host": "127.0.0.1",
+  "ib_port": 7497,
+  "ib_client_id": 1,
+  "ib_account": "",
+  "total_capital": 100000,
+  "position_size_pct": 95,
+  
+  "_comment_strategy": "Strategy parameters for QQQ/TQQQ rotation",
+  "_comment_short_ma": "Short moving average period (days) - default 30",
+  "_comment_long_ma": "Long moving average period (days) - default 120",
+  "_comment_check_interval": "How often to check for signals (minutes) - default 15",
+  
+  "_comment_trading": "Trading settings",
+  "_comment_dry_run": "Set to false to enable live trading (currently simulated only)",
+  "_comment_notifications": "Enable email/SMS notifications for position changes",
+  "_comment_ib_port": "IB Port: 7497 for Paper Trading, 7496 for Live Trading",
+  "_comment_position_size": "Use 95% of capital for positions, keep 5% as cash buffer",
+  
+  "_comment_market": "Market hours settings (Eastern Time)",
+  "_comment_trading_hours": "Only trade during market hours (9:30 AM - 4:00 PM ET)",
+  
+
+  
+  "_notification_comment": "Configure notification settings (email, SMS, Telegram, etc.)",
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "from_address": "",
+      "to_address": "",
+      "password": ""
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    }
+  }
+}
