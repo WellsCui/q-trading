@@ -1,0 +1,76 @@
+{
+  "_comment": "Quantitative Trading Agent Configuration",
+  "_description": "Configure trading strategies, symbols, and risk parameters",
+  
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "DIA"
+  ],
+  
+  "active_strategy": "MovingAverageCrossover",
+  
+  "strategies": {
+    "MovingAverageCrossover": {
+      "_description": "Classic moving average crossover strategy",
+      "short_window": 50,
+      "long_window": 200,
+      "price_threshold": 0.0
+    },
+    "Momentum": {
+      "_description": "RSI and Rate of Change momentum strategy",
+      "rsi_period": 14,
+      "rsi_oversold": 30,
+      "rsi_overbought": 70,
+      "roc_period": 20
+    },
+    "MeanReversion": {
+      "_description": "Bollinger Bands mean reversion strategy",
+      "bb_period": 20,
+      "bb_std": 2.0,
+      "entry_threshold": 0.02
+    },
+    "TrendFollowing": {
+      "_description": "ADX-based trend following with volume confirmation",
+      "ma_period": 50,
+      "adx_period": 14,
+      "adx_threshold": 25,
+      "volume_ma_period": 20
+    }
+  },
+  
+  "_comment_risk": "Risk Management Parameters",
+  "max_position_size": 0.2,
+  "stop_loss_pct": 0.05,
+  "take_profit_pct": 0.15,
+  "max_total_exposure": 0.8,
+  
+  "_comment_trading": "Trading Settings",
+  "check_interval_minutes": 60,
+  "dry_run": true,
+  "data_lookback_days": 300,
+  "trading_hours_only": true,
+  "market_open_hour": 9,
+  "market_close_hour": 16,
+  
+  "_comment_broker": "Broker Integration",
+  "broker": {
+    "type": "mock",
+    "_comment_type": "Broker type: 'mock' for testing, 'ib' for Interactive Brokers",
+    "total_capital": 100000,
+    "position_size_pct": 95,
+    
+    "_comment_ib": "Interactive Brokers Settings (only used if type='ib')",
+    "ib_host": "127.0.0.1",
+    "ib_port": 7497,
+    "_comment_port": "7497 for paper trading, 7496 for live trading",
+    "ib_client_id": 3,
+    "ib_account": ""
+  },
+  
+  "_comment_notifications": "Notification Settings (Optional)",
+  "enable_notifications": false,
+  "notification_email": "",
+  "notification_webhook": ""
+}

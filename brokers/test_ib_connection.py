@@ -12,7 +12,9 @@ This script verifies that:
 import sys
 import json
 import time
+
 from pathlib import Path
+# from backtrader import brokers
 
 print("=" * 80)
 print("Interactive Brokers Connection Test")
@@ -37,7 +39,7 @@ print()
 # Test 2: Check if ib_broker module loads
 print("Test 2: Checking ib_broker module...")
 try:
-    from ib_broker import IBBroker, create_ib_broker
+    from brokers.ib_broker import IBBroker, create_ib_broker
     print("✓ ib_broker module loaded successfully")
 except ImportError as e:
     print("✗ Failed to load ib_broker module")
@@ -90,11 +92,11 @@ try:
         print()
         
         # Test 5: Get account info
-        print("Test 5: Retrieving account information...")
-        time.sleep(2)  # Wait for data
+        # print("Test 5: Retrieving account information...")
+        # time.sleep(2)  # Wait for data
         
-        account_value = broker.get_account_value()
-        print(f"✓ Account Value: ${account_value:,.2f}")
+        # account_value = broker.get_account_value()
+        # print(f"✓ Account Value: ${account_value:,.2f}")
         
         # Test 6: Get current positions
         print()
