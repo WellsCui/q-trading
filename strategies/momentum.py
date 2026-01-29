@@ -52,16 +52,33 @@ class MomentumStrategy(TradingStrategy):
         # Generate signals
         signal = Signal.HOLD
         reason = ""
+        score = 0.0
         
         if current_rsi < self.rsi_oversold and current_roc < 0:
             signal = Signal.BUY
             reason = f"Oversold: RSI={current_rsi:.1f} < {self.rsi_oversold}, ROC={current_roc:.2f}%"
+            # Strong buy: lower RSI = stronger signal, negative ROC amplifies
+            rsi_score = (self.rsi_oversold - current_rsi) * 2  # 0-60 range
+            roc_score = min(40, -current_roc * 2)  # 0-40 range for negative ROC
+            score = min(100, rsi_score + roc_score)
         elif current_rsi > self.rsi_overbought and current_roc > 5:
             signal = Signal.SELL
             reason = f"Overbought: RSI={current_rsi:.1f} > {self.rsi_overbought}, ROC={current_roc:.2f}%"
+            # Strong sell: higher RSI = stronger signal, positive ROC amplifies
+            rsi_score = -(current_rsi - self.rsi_overbought) * 2  # 0 to -60 range
+            roc_score = -min(40, (current_roc - 5) * 2)  # 0 to -40 range
+            score = max(-100, rsi_score + roc_score)
         elif current_rsi > 50 and current_roc > 0:
             signal = Signal.BUY
             reason = f"Momentum: RSI={current_rsi:.1f}, positive ROC={current_roc:.2f}%"
+            # Moderate buy based on momentum strength
+            rsi_score = (current_rsi - 50) * 0.8  # 0-40 range
+            roc_score = min(40, current_roc * 2)  # 0-40 range
+            score = min(100, rsi_score + roc_score)
+        else:
+            # Neutral to bearish
+            score = (current_rsi - 50) * 0.5 + current_roc * 0.5
+            score = max(-50, min(50, score))
         
         details = {
             'timestamp': datetime.now().isoformat(),
@@ -69,6 +86,7 @@ class MomentumStrategy(TradingStrategy):
             'strategy': self.name,
             'signal': signal.value,
             'reason': reason,
+            'score': score,
             'price': current_price,
             'rsi': current_rsi,
             'roc': current_roc,

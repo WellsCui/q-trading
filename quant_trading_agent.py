@@ -156,7 +156,7 @@ class QuantTradingAgent:
             'take_profit_pct': 0.15,
             'check_interval_minutes': 60,
             'dry_run': True,
-            'data_lookback_days': 300
+            'data_lookback_days': 120
         }
     
     def _create_broker(self) -> BrokerInterface:
@@ -486,6 +486,9 @@ class QuantTradingAgent:
         logger.info(f"Analysis Cycle Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(f"{'='*80}")
         
+        # Step 1: Analyze all symbols and collect scores
+        symbol_scores = []
+        
         for symbol in self.symbols:
             try:
                 logger.info(f"\nAnalyzing {symbol}...")
@@ -497,24 +500,95 @@ class QuantTradingAgent:
                     continue
                 
                 signal, details = result
+                score = details.get('score', 0)
                 
-                # Check risk management
+                # Check risk management for existing positions
                 current_price = details.get('price')
                 risk_signal = self.check_risk_management(symbol, current_price)
-                if risk_signal:
-                    signal = risk_signal
                 
-                # Execute signal
-                if signal != Signal.HOLD or symbol in self.positions:
-                    self.execute_signal(symbol, signal, details)
-                else:
-                    logger.info(f"{symbol}: {signal.value} - {details.get('reason', '')}")
+                # If risk management triggers, close position immediately
+                if risk_signal:
+                    logger.warning(f"{symbol}: Risk management triggered")
+                    self.execute_signal(symbol, risk_signal, details)
+                    continue
+                
+                # Store symbol with its score and details
+                symbol_scores.append({
+                    'symbol': symbol,
+                    'score': score,
+                    'signal': signal,
+                    'details': details,
+                    'has_position': symbol in self.positions and self.positions[symbol].get('has_position', False)
+                })
+                
+                logger.info(f"{symbol}: Score={score:.2f}, Signal={signal.value}")
                 
             except Exception as e:
                 logger.error(f"Error analyzing {symbol}: {e}", exc_info=True)
         
+        # Step 2: Sort by score (highest first for buy signals)
+        symbol_scores.sort(key=lambda x: x['score'], reverse=True)
+        
+        logger.info(f"\n{'='*80}")
+        logger.info("Symbol Ranking by Score")
+        logger.info(f"{'='*80}")
+        for i, item in enumerate(symbol_scores[:10], 1):  # Show top 10
+            logger.info(f"{i}. {item['symbol']}: Score={item['score']:.2f}, Signal={item['signal'].value}")
+        
+        # Step 3: Calculate current exposure
+        current_exposure = sum(
+            self.max_position_size for sym, pos in self.positions.items()
+            if pos.get('has_position', False)
+        )
+        
+        max_total_exposure = self.config.get('max_total_exposure', 0.8)
+        available_exposure = max_total_exposure - current_exposure
+        
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Portfolio Exposure")
+        logger.info(f"{'='*80}")
+        logger.info(f"Current Exposure: {current_exposure * 100:.1f}%")
+        logger.info(f"Max Total Exposure: {max_total_exposure * 100:.1f}%")
+        logger.info(f"Available Exposure: {available_exposure * 100:.1f}%")
+        logger.info(f"Max Position Size: {self.max_position_size * 100:.1f}%")
+        
+        # Step 4: Select top symbols to buy (limit to top 5 buy signals)
+        positions_to_open = []
+        buy_candidates = [item for item in symbol_scores if item['score'] > 0 and not item['has_position']]
+        
+        for item in buy_candidates[:5]:  # Top 5 buy signals
+            if available_exposure >= self.max_position_size:
+                positions_to_open.append(item)
+                available_exposure -= self.max_position_size
+            else:
+                logger.info(f"Skipping {item['symbol']}: Insufficient exposure available")
+                break
+        
+        # Step 5: Execute trades for selected symbols
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Executing Trades")
+        logger.info(f"{'='*80}")
+        
+        if positions_to_open:
+            logger.info(f"Opening {len(positions_to_open)} new positions:")
+            for item in positions_to_open:
+                logger.info(f"  - {item['symbol']}: Score={item['score']:.2f}")
+                self.execute_signal(item['symbol'], Signal.BUY, item['details'])
+        else:
+            logger.info("No new positions to open")
+        
+        # Step 6: Check existing positions for sell signals
+        sell_candidates = [item for item in symbol_scores if item['has_position'] and item['score'] < -20]
+        
+        if sell_candidates:
+            logger.info(f"\nClosing {len(sell_candidates)} positions with weak signals:")
+            for item in sell_candidates:
+                logger.info(f"  - {item['symbol']}: Score={item['score']:.2f}")
+                self.execute_signal(item['symbol'], Signal.SELL, item['details'])
+        
         logger.info(f"\n{'='*80}")
         logger.info(f"Analysis Cycle Completed")
+        logger.info(f"Active Positions: {sum(1 for pos in self.positions.values() if pos.get('has_position', False))}")
         logger.info(f"{'='*80}\n")
     
     def run(self):

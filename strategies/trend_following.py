@@ -87,19 +87,42 @@ class TrendFollowingStrategy(TradingStrategy):
         # Generate signals
         signal = Signal.HOLD
         reason = ""
+        score = 0.0
+        
+        # Calculate components for score
+        price_vs_ma = ((current_price - ma) / ma) * 100
+        adx_strength = min(100, (adx / 50) * 100)  # Normalize ADX to 0-100
+        volume_ratio = (current_volume / volume_ma) if volume_ma > 0 else 1
         
         if is_uptrend and is_strong_trend and volume_confirmed:
             signal = Signal.BUY
             reason = f"Strong uptrend: Price > MA, ADX={adx:.1f} > {self.adx_threshold}, volume confirmed"
+            # Strong buy: combine trend strength, ADX, and volume
+            base_score = 50
+            adx_bonus = min(30, (adx - self.adx_threshold) * 1.5)
+            price_bonus = min(20, price_vs_ma * 2)
+            volume_bonus = min(20, (volume_ratio - 0.8) * 50)
+            score = min(100, base_score + adx_bonus + price_bonus + volume_bonus)
         elif not is_uptrend and is_strong_trend and volume_confirmed:
             signal = Signal.SELL
             reason = f"Strong downtrend: Price < MA, ADX={adx:.1f} > {self.adx_threshold}, volume confirmed"
+            # Strong sell: combine trend strength, ADX, and volume
+            base_score = -50
+            adx_penalty = -min(30, (adx - self.adx_threshold) * 1.5)
+            price_penalty = -min(20, abs(price_vs_ma) * 2)
+            volume_penalty = -min(20, (volume_ratio - 0.8) * 50)
+            score = max(-100, base_score + adx_penalty + price_penalty + volume_penalty)
         elif is_uptrend and not is_strong_trend:
             signal = Signal.HOLD
             reason = f"Weak uptrend: ADX={adx:.1f} < {self.adx_threshold}"
+            # Weak buy signal
+            score = min(30, 10 + price_vs_ma + (adx / self.adx_threshold) * 10)
         else:
             signal = Signal.HOLD
             reason = f"No clear trend: ADX={adx:.1f}"
+            # Very weak signal based on price position
+            score = price_vs_ma * 0.5
+            score = max(-20, min(20, score))
         
         details = {
             'timestamp': datetime.now().isoformat(),
@@ -107,6 +130,7 @@ class TrendFollowingStrategy(TradingStrategy):
             'strategy': self.name,
             'signal': signal.value,
             'reason': reason,
+            'score': score,
             'price': current_price,
             'ma': ma,
             'adx': adx,

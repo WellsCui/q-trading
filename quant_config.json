@@ -3,10 +3,16 @@
   "_description": "Configure trading strategies, symbols, and risk parameters",
   
   "symbols": [
-    "SPY",
-    "QQQ",
-    "IWM",
-    "DIA"
+    "QQQ","AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA", "AVGO", "COST",
+    "NFLX", "AMD", "PEP", "ADBE", "CSCO", "TMUS", "CMCSA", "INTC", "INTU", "TXN",
+    "QCOM", "AMGN", "HON", "AMAT", "SBUX", "ISRG", "GILD", "BKNG", "VRTX", "ADP",
+    "LRCX", "MDLZ", "REGN", "ADI", "MU", "PYPL", "PANW", "KLAC", "SNPS", "CDNS",
+    "MELI", "ASML", "MAR", "ABNB", "CRWD", "CHTR", "NXPI", "WDAY", "MRNA", "FTNT",
+    "MNST", "ORLY", "DXCM", "LULU", "CTAS", "PAYX", "AEP", "PCAR", "MCHP", "IDXX",
+    "KDP", "ROST", "EA", "CPRT", "ODFL", "CTSH", "FAST", "BKR", "DDOG", "TEAM",
+    "GEHC", "VRSK", "BIIB", "ILMN", "XEL", "ANSS", "EXC", "KHC", "DLTR", "CSGP",
+    "FANG", "ZS", "ALGN", "ON", "WBD", "ENPH", "SIRI", "MTCH", "ZM", "RIVN",
+    "LCID", "TTD", "DASH", "COIN", "SNOW", "DKNG", "OKTA", "DOCU", "NET", "SPLK"
   ],
   
   "active_strategy": "MovingAverageCrossover",
@@ -14,8 +20,8 @@
   "strategies": {
     "MovingAverageCrossover": {
       "_description": "Classic moving average crossover strategy",
-      "short_window": 50,
-      "long_window": 200,
+      "short_window": 20,
+      "long_window": 50,
       "price_threshold": 0.0
     },
     "Momentum": {
@@ -49,7 +55,7 @@
   "_comment_trading": "Trading Settings",
   "check_interval_minutes": 60,
   "dry_run": true,
-  "data_lookback_days": 300,
+  "data_lookback_days": 120,
   "trading_hours_only": true,
   "market_open_hour": 9,
   "market_close_hour": 16,

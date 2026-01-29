@@ -50,19 +50,28 @@ class MeanReversionStrategy(TradingStrategy):
         # Generate signals
         signal = Signal.HOLD
         reason = ""
+        score = 0.0
         
         if bb_position <= self.entry_threshold:
             # Price near lower band - oversold
             signal = Signal.BUY
             reason = f"Oversold: Price ${current_price:.2f} near lower band ${bb_lower:.2f}"
+            # Score: stronger buy as price gets closer to lower band (0 = strongest)
+            score = (self.entry_threshold - bb_position) * 500  # Scale to 0-100
+            score = min(100, score)
         elif bb_position >= (1 - self.entry_threshold):
             # Price near upper band - overbought
             signal = Signal.SELL
             reason = f"Overbought: Price ${current_price:.2f} near upper band ${bb_upper:.2f}"
+            # Score: stronger sell as price gets closer to upper band (1 = strongest)
+            score = (bb_position - (1 - self.entry_threshold)) * -500  # Scale to -100-0
+            score = max(-100, score)
         elif abs(current_price - bb_middle) / bb_middle < 0.005:
             # Price near middle - potential entry
             signal = Signal.HOLD
             reason = f"Neutral: Price near middle band ${bb_middle:.2f}"
+            # Score based on position relative to middle
+            score = (bb_position - 0.5) * 20  # Small score near 0
         
         details = {
             'timestamp': datetime.now().isoformat(),
@@ -70,6 +79,7 @@ class MeanReversionStrategy(TradingStrategy):
             'strategy': self.name,
             'signal': signal.value,
             'reason': reason,
+            'score': score,
             'price': current_price,
             'bb_upper': bb_upper,
             'bb_lower': bb_lower,
