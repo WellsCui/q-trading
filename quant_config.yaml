@@ -3,13 +3,13 @@
 
 symbols:
   - QQQ
-  # - AAPL
-  # - MSFT
-  # - GOOG
-  # - AMZN
-  # - NVDA
-  # - META
-  # - TSLA
+  - AAPL
+  - MSFT
+  - GOOG
+  - AMZN
+  - NVDA
+  - META
+  - TSLA
   # - AVGO
   # - COST
   # - NFLX
@@ -103,7 +103,7 @@ symbols:
   # - NET
   # - SPLK
 
-active_strategy: VWAP
+active_strategy: MovingAverageCrossover
 
 strategies:
   VWAP:
@@ -116,7 +116,7 @@ strategies:
   MovingAverageCrossover:
     # Classic moving average crossover strategy
     short_window: 30
-    long_window: 200
+    long_window: 300
     price_threshold: 0.0
   
   Momentum:
@@ -146,8 +146,8 @@ take_profit_pct: 0.15
 max_total_exposure: 0.8
 
 # Trading Settings
-check_interval_minutes: 60
-dry_run: true
+check_interval_minutes: 1
+dry_run: false
 data_lookback_days: 120
 trading_hours_only: true
 market_open_hour: 9
@@ -175,7 +175,7 @@ broker:
   ib_host: 127.0.0.1
   ib_port: 7497
   # 7497 for paper trading, 7496 for live trading
-  ib_client_id: ""
+  ib_client_id: "agent_001"
   # Leave empty ("") to auto-generate a unique client ID on startup
   ib_account: ""
 

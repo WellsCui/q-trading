@@ -35,8 +35,15 @@ class TwelveDataProvider(MarketDataProvider):
     def is_available(self) -> bool:
         return self._available
     
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical data from Twelve Data API"""
+    def get_historical_data(self, symbol: str, days: int, interval: str = '1d', **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical data from Twelve Data API
+        
+        Args:
+            symbol: Stock symbol
+            days: Number of days/periods to fetch
+            interval: Data interval - valid values: 1min, 5min, 15min, 30min, 45min, 
+                     1h, 2h, 4h, 1day, 1week, 1month
+        """
         if not self.is_available():
             logger.warning(f"[TwelveData] API key not available, cannot fetch data for {symbol}")
             return None
@@ -45,22 +52,22 @@ class TwelveDataProvider(MarketDataProvider):
             start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
             end_date = datetime.now().strftime('%Y-%m-%d')
             
-            logger.info(f"[TwelveData] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
+            # Map common interval formats to TwelveData format
+            interval_map = {
+                '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min',
+                '1h': '1h', '2h': '2h', '4h': '4h',
+                '1d': '1day', '1w': '1week', '1M': '1month'
+            }
+            twelvedata_interval = interval_map.get(interval, interval)
             
-            # Determine interval based on days requested
-            if days <= 30:
-                interval = "1day"
-                outputsize = days
-            elif days <= 365:
-                interval = "1day"
-                outputsize = min(days, 5000)  # API limit
-            else:
-                interval = "1week"
-                outputsize = min(days // 7, 5000)
+            logger.info(f"[TwelveData] Fetching {days} days of {twelvedata_interval} data for {symbol} ({start_date} to {end_date})")
+            
+            # Calculate outputsize based on interval and days
+            outputsize = min(days * (1440 // self._interval_to_minutes(twelvedata_interval)), 5000)
             
             params = {
                 'symbol': symbol,
-                'interval': interval,
+                'interval': twelvedata_interval,
                 'outputsize': outputsize,
                 'apikey': self.api_key,
                 'format': 'JSON',
@@ -110,7 +117,7 @@ class TwelveDataProvider(MarketDataProvider):
             if 'Volume' in df.columns:
                 df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0).astype(int)
             
-            logger.info(f"[TwelveData] Fetched {len(df)} days of data for {symbol}")
+            logger.info(f"[TwelveData] Fetched {len(df)} data points for {symbol}")
             return df
             
         except requests.exceptions.RequestException as e:
@@ -120,3 +127,12 @@ class TwelveDataProvider(MarketDataProvider):
         except Exception as e:
             logger.error(f"[TwelveData] Error fetching data for {symbol}: {e}")
             return None
+    
+    def _interval_to_minutes(self, interval: str) -> int:
+        """Convert interval string to approximate minutes"""
+        interval_minutes = {
+            '1min': 1, '5min': 5, '15min': 15, '30min': 30, '45min': 45,
+            '1h': 60, '2h': 120, '4h': 240,
+            '1day': 1440, '1week': 10080, '1month': 43200
+        }
+        return interval_minutes.get(interval, 1440)

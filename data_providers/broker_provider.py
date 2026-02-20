@@ -33,20 +33,41 @@ class BrokerDataProvider(MarketDataProvider):
     def is_available(self) -> bool:
         return self.broker is not None and self.broker.is_connected()
     
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical data from broker"""
+    def get_historical_data(self, symbol: str, days: int, interval: str = '1d', **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical data from broker
+        
+        Args:
+            symbol: Stock symbol
+            days: Number of days/periods to fetch
+            interval: Data interval (e.g., '1m', '5m', '15m', '30m', '1h', '1d')
+        """
         if not self.is_available():
             logger.warning(f"[Broker] Not connected, cannot fetch data for {symbol}")
             return None
         
         try:
-            duration = kwargs.get('duration', f"{days} D")
-            bar_size = kwargs.get('bar_size', "1 D")
+            # Map interval to IB bar size format
+            interval_map = {
+                '1m': '1 min', '5m': '5 mins', '15m': '15 mins', '30m': '30 mins',
+                '1h': '1 hour', '2h': '2 hours', '4h': '4 hours',
+                '1d': '1 day', '1w': '1 week', '1M': '1 month'
+            }
+            bar_size = kwargs.get('bar_size', interval_map.get(interval, '1 day'))
+            
+            # Adjust duration based on interval
+            if interval in ['1m', '5m', '15m', '30m', '1h']:
+                # For intraday, use seconds/hours
+                if days <= 1:
+                    duration = kwargs.get('duration', f"{days * 86400} S")  # seconds
+                else:
+                    duration = kwargs.get('duration', f"{days} D")
+            else:
+                duration = kwargs.get('duration', f"{days} D")
             
             start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
             end_date = datetime.now().strftime('%Y-%m-%d')
             
-            logger.info(f"[Broker] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
+            logger.info(f"[Broker] Fetching {days} days of {interval} data for {symbol} ({start_date} to {end_date})")
             
             data = self.broker.get_historical_data(symbol, duration=duration, bar_size=bar_size)
             

@@ -302,13 +302,18 @@ class QuantTradingAgent:
         
         return None
     
-    def fetch_market_data(self, symbol: str, days: int = None) -> Optional[pd.DataFrame]:
+    def fetch_market_data(self, symbol: str, days: int = None, interval: str = '1d') -> Optional[pd.DataFrame]:
         """
         Fetch market data for a symbol using configured data source
         
         Args:
             symbol: Stock symbol
             days: Number of days of historical data (None = use config default)
+            interval: Data interval/timeframe (default: '1d' for daily)
+                     - Minutes: '1m', '5m', '15m', '30m'
+                     - Hours: '1h', '2h', '4h'
+                     - Days: '1d' (default)
+                     - Weeks: '1w'
             
         Returns:
             DataFrame with OHLCV data
@@ -317,7 +322,7 @@ class QuantTradingAgent:
             days = self.config.get('data_lookback_days', 300)
         
         try:
-            data = self.data_source.get_historical_data(symbol, days)
+            data = self.data_source.get_historical_data(symbol, days, interval)
             return data
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {e}", exc_info=True)

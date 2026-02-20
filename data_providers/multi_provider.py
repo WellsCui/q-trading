@@ -20,15 +20,21 @@ class MultiProviderDataSource:
         self.providers = providers
         logger.info(f"Initialized data source with {len(providers)} providers: {[p.name for p in providers]}")
     
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch data from first available provider"""
+    def get_historical_data(self, symbol: str, days: int, interval: str = '1d', **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch data from first available provider
+        
+        Args:
+            symbol: Stock symbol
+            days: Number of days/periods to fetch
+            interval: Data interval (e.g., '1m', '5m', '1h', '1d')
+        """
         for provider in self.providers:
             if not provider.is_available():
                 logger.debug(f"Provider {provider.name} not available, trying next...")
                 continue
             
-            logger.info(f"Attempting to fetch {symbol} data from {provider.name}")
-            data = provider.get_historical_data(symbol, days, **kwargs)
+            logger.info(f"Attempting to fetch {symbol} {interval} data from {provider.name}")
+            data = provider.get_historical_data(symbol, days, interval, **kwargs)
             
             if data is not None and not data.empty:
                 logger.info(f"Successfully fetched {symbol} data from {provider.name}")
