@@ -20,8 +20,8 @@
   "strategies": {
     "MovingAverageCrossover": {
       "_description": "Classic moving average crossover strategy",
-      "short_window": 20,
-      "long_window": 50,
+      "short_window": 10,
+      "long_window": 25,
       "price_threshold": 0.0
     },
     "Momentum": {
@@ -60,9 +60,15 @@
   "market_open_hour": 9,
   "market_close_hour": 16,
   
+  "_comment_data": "Market Data Provider Configuration",
+  "data_provider": "auto",
+  "_comment_provider": "Options: 'yfinance', 'broker', or 'auto' (tries multiple with fallback)",
+  "data_provider_priority": ["broker", "yfinance"],
+  "_comment_priority": "Provider priority order when data_provider='auto'. First available provider will be used.",
+  
   "_comment_broker": "Broker Integration",
   "broker": {
-    "type": "mock",
+    "type": "ib",
     "_comment_type": "Broker type: 'mock' for testing, 'ib' for Interactive Brokers",
     "total_capital": 100000,
     "position_size_pct": 95,

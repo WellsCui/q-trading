@@ -24,6 +24,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -57,6 +58,132 @@ logging.basicConfig(
 logger = logging.getLogger("QuantTradingAgent")
 
 
+class MarketDataProvider(ABC):
+    """Abstract base class for market data providers"""
+    
+    @abstractmethod
+    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical market data for a symbol"""
+        pass
+    
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Check if provider is available"""
+        pass
+    
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Provider name"""
+        pass
+
+
+class YFinanceProvider(MarketDataProvider):
+    """Yahoo Finance data provider"""
+    
+    def __init__(self):
+        self._available = True
+    
+    @property
+    def name(self) -> str:
+        return "YFinance"
+    
+    def is_available(self) -> bool:
+        return self._available
+    
+    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical data from Yahoo Finance"""
+        try:
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            
+            logger.info(f"[YFinance] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
+            
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(start=start_date, end=end_date)
+            
+            if data.empty:
+                logger.error(f"[YFinance] No data received for {symbol}")
+                return None
+            
+            logger.info(f"[YFinance] Fetched {len(data)} days of data for {symbol}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"[YFinance] Error fetching data for {symbol}: {e}")
+            self._available = False
+            return None
+
+
+class BrokerDataProvider(MarketDataProvider):
+    """Broker-based data provider (e.g., Interactive Brokers)"""
+    
+    def __init__(self, broker: Optional[BrokerInterface]):
+        self.broker = broker
+    
+    @property
+    def name(self) -> str:
+        return f"Broker ({type(self.broker).__name__ if self.broker else 'None'})"
+    
+    def is_available(self) -> bool:
+        return self.broker is not None and self.broker.is_connected()
+    
+    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical data from broker"""
+        if not self.is_available():
+            logger.warning(f"[Broker] Not connected, cannot fetch data for {symbol}")
+            return None
+        
+        try:
+            duration = kwargs.get('duration', f"{days} D")
+            bar_size = kwargs.get('bar_size', "1 D")
+            
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            
+            logger.info(f"[Broker] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
+            
+            data = self.broker.get_historical_data(symbol, duration=duration, bar_size=bar_size)
+            
+            if data is not None and not data.empty:
+                logger.info(f"[Broker] Fetched {len(data)} data points for {symbol}")
+                return data
+            else:
+                logger.warning(f"[Broker] No data received for {symbol}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"[Broker] Error fetching data for {symbol}: {e}")
+            return None
+
+
+class MultiProviderDataSource:
+    """Manages multiple data providers with fallback support"""
+    
+    def __init__(self, providers: List[MarketDataProvider]):
+        self.providers = providers
+        logger.info(f"Initialized data source with {len(providers)} providers: {[p.name for p in providers]}")
+    
+    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch data from first available provider"""
+        for provider in self.providers:
+            if not provider.is_available():
+                logger.debug(f"Provider {provider.name} not available, trying next...")
+                continue
+            
+            logger.info(f"Attempting to fetch {symbol} data from {provider.name}")
+            data = provider.get_historical_data(symbol, days, **kwargs)
+            
+            if data is not None and not data.empty:
+                logger.info(f"Successfully fetched {symbol} data from {provider.name}")
+                return data
+            else:
+                logger.warning(f"Failed to fetch {symbol} data from {provider.name}, trying next provider")
+        
+        logger.error(f"All providers failed for {symbol}")
+        return None
+
+
 class QuantTradingAgent:
     """
     Main Quantitative Trading Agent that coordinates strategies and manages positions
@@ -70,15 +197,21 @@ class QuantTradingAgent:
             config_path: Path to configuration file
             broker: Broker instance (if None, will create based on config)
         """
+        logger.info("loading agent configuration...")
         self.config = self._load_config(config_path)
         self.strategies: Dict[str, TradingStrategy] = {}
         self.positions: Dict[str, Dict] = {}  # Current positions per symbol
         self.running = True
         
         # Initialize broker
+        logger.info("Initializing broker...")
         self.broker = broker
         if self.broker is None:
             self.broker = self._create_broker()
+        
+        # Initialize market data providers
+        logger.info("Initializing market data providers...")
+        self.data_source = self._create_data_source()
         
         # Initialize strategies
         self._initialize_strategies()
@@ -98,6 +231,7 @@ class QuantTradingAgent:
         logger.info("=" * 80)
         logger.info("Quantitative Trading Agent Initialized")
         logger.info("=" * 80)
+        logger.info(f"Data Providers: {[p.name for p in self.data_source.providers]}")
         logger.info(f"Broker: {type(self.broker).__name__}")
         logger.info(f"Broker Connected: {self.broker.is_connected() if self.broker else False}")
         logger.info(f"Strategies: {', '.join(self.strategies.keys())}")
@@ -156,13 +290,15 @@ class QuantTradingAgent:
             'take_profit_pct': 0.15,
             'check_interval_minutes': 60,
             'dry_run': True,
-            'data_lookback_days': 120
+            'data_lookback_days': 120,
+            'data_provider': 'yfinance',  # yfinance, broker, or auto (fallback)
+            'data_provider_priority': ['broker', 'yfinance']  # Priority order for auto mode
         }
     
     def _create_broker(self) -> BrokerInterface:
         """Create broker instance based on configuration"""
         broker_type = self.config.get('broker', {}).get('type', 'mock')
-        
+        logger.info(f"creating broker: {broker_type} ...")
         if broker_type == 'ib' or broker_type == 'interactive_brokers':
             # Create Interactive Brokers connection
             try:
@@ -198,7 +334,45 @@ class QuantTradingAgent:
                 self.strategies[strategy_name] = strategy_classes[strategy_name](strategy_config)
                 logger.info(f"Initialized strategy: {strategy_name}")
     
-    def fetch_market_data_from_broker(self, symbol: str) -> Optional[pd.DataFrame]:
+    def _create_data_source(self) -> MultiProviderDataSource:
+        """Create market data source with configured providers"""
+        data_provider_config = self.config.get('data_provider', 'yfinance')
+        provider_priority = self.config.get('data_provider_priority', ['yfinance'])
+        
+        providers = []
+        
+        if data_provider_config == 'auto':
+            # Use priority order
+            for provider_name in provider_priority:
+                provider = self._create_provider(provider_name)
+                if provider:
+                    providers.append(provider)
+        else:
+            # Use single specified provider
+            provider = self._create_provider(data_provider_config)
+            if provider:
+                providers.append(provider)
+            # Add yfinance as fallback if not already included
+            if data_provider_config != 'yfinance':
+                providers.append(YFinanceProvider())
+        
+        if not providers:
+            logger.warning("No data providers configured, using YFinance as default")
+            providers.append(YFinanceProvider())
+        
+        return MultiProviderDataSource(providers)
+    
+    def _create_provider(self, provider_name: str) -> Optional[MarketDataProvider]:
+        """Create a specific data provider"""
+        if provider_name == 'yfinance':
+            return YFinanceProvider()
+        elif provider_name == 'broker':
+            return BrokerDataProvider(self.broker)
+        else:
+            logger.warning(f"Unknown data provider: {provider_name}")
+            return None
+    
+    def fetch_market_data_from_broker(self, symbol: str, duration="1 D", bar_size="1 min") -> Optional[pd.DataFrame]:
         """
         Fetch market data from the broker
         
@@ -214,7 +388,7 @@ class QuantTradingAgent:
         
         try:
             # Try to get historical data from broker
-            data = self.broker.get_historical_data(symbol, duration="1 D", bar_size="1 min")
+            data = self.broker.get_historical_data(symbol, duration=duration, bar_size=bar_size)
             if data is not None and not data.empty:
                 logger.info(f"Fetched {len(data)} data points for {symbol} from broker")
                 return data
@@ -225,7 +399,7 @@ class QuantTradingAgent:
     
     def fetch_market_data(self, symbol: str, days: int = None) -> Optional[pd.DataFrame]:
         """
-        Fetch market data for a symbol
+        Fetch market data for a symbol using configured data source
         
         Args:
             symbol: Stock symbol
@@ -234,32 +408,12 @@ class QuantTradingAgent:
         Returns:
             DataFrame with OHLCV data
         """
-        # First try to get data from broker if connected
-        if self.broker and self.broker.is_connected():
-            broker_data = self.fetch_market_data_from_broker(symbol)
-            if broker_data is not None and not broker_data.empty:
-                return broker_data
-        
-        # Fall back to yfinance
         if days is None:
             days = self.config.get('data_lookback_days', 300)
         
         try:
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            
-            logger.info(f"Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
-            
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(start=start_date, end=end_date)
-            
-            if data.empty:
-                logger.error(f"No data received for {symbol}")
-                return None
-            
-            logger.info(f"Fetched {len(data)} days of data for {symbol}")
+            data = self.data_source.get_historical_data(symbol, days)
             return data
-            
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {e}", exc_info=True)
             return None

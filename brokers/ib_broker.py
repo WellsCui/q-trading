@@ -54,10 +54,10 @@ class IBClient(EWrapper, EClient):
         EWrapper.__init__(self)
         EClient.__init__(self, self)
         
-        # Connection settings
-        self.host = config['api']['tws_endpoint']
-        self.port = config['api']['port']
-        self.client_id = 1
+        # Connection settings 
+        self.host = config.get('ib_host', '127.0.0.1')
+        self.port = config.get('ib_port', 7497)
+        self.client_id = config.get('ib_client_id', 1)
         
         # Data storage with default values
         self.market_data = defaultdict(lambda: {
