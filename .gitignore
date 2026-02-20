@@ -1,3 +1,4 @@
 *.pyc
 logs
 .vscode/settings.json
+q-trading.code-workspace
