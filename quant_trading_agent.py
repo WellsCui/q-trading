@@ -349,7 +349,7 @@ class QuantTradingAgent:
         strategy = self.strategies[strategy_name]
         
         # Fetch market data
-        data = self.fetch_market_data(symbol, days=strategy.get_required_data_period())
+        data = self.fetch_market_data(symbol, days=strategy.get_required_data_period(), interval='5m')
         if data is None:
             return None
         
@@ -550,17 +550,53 @@ class QuantTradingAgent:
         logger.info(f"Analysis Cycle Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(f"{'='*80}")
         
+        # Print current positions
+        logger.info(f"\n{'='*80}")
+        logger.info("Current Positions")
+        logger.info(f"{'='*80}")
+        if self.positions:
+            active_positions = {sym: pos for sym, pos in self.positions.items() if pos.get('has_position', False)}
+            if active_positions:
+                for symbol, position in active_positions.items():
+                    entry_price = position.get('entry_price', 0)
+                    entry_time = position.get('entry_time', 'N/A')
+                    quantity = position.get('quantity', 0)
+                    strategy = position.get('strategy', 'Unknown')
+                    logger.info(f"  {symbol}: Entry=${entry_price:.2f}, Qty={quantity}, Strategy={strategy}, Time={entry_time}")
+            else:
+                logger.info("  No active positions")
+        else:
+            logger.info("  No active positions")
+        
+        # Print current orders from broker
+        logger.info(f"\n{'='*80}")
+        logger.info("Current Orders")
+        logger.info(f"{'='*80}")
+        if self.broker and self.broker.is_connected():
+            try:
+                orders = self.broker.get_orders()
+                if orders:
+                    for order in orders:
+                        logger.info(f"  Order: {order}")
+                else:
+                    logger.info("  No open orders")
+            except Exception as e:
+                logger.warning(f"  Could not fetch orders: {e}")
+        else:
+            logger.info("  Broker not connected - cannot fetch orders")
+        
         # Step 1: Analyze all symbols and collect scores
         symbol_scores = []
         
         for symbol in self.symbols:
             try:
-                logger.info(f"\nAnalyzing {symbol}...")
+                strategy_name = self.config.get('active_strategy', 'MovingAverageCrossover')
+                logger.info(f"\nAnalyzing {symbol} using {strategy_name} strategy...")
                 
                 # Get signal from strategy
-                result = self.analyze_symbol(symbol)
+                result = self.analyze_symbol(symbol, strategy_name)
                 if result is None:
-                    logger.warning(f"Failed to analyze {symbol}")
+                    logger.warning(f"Failed to analyze {symbol} using {strategy_name} strategy")
                     continue
                 
                 signal, details = result
@@ -599,7 +635,22 @@ class QuantTradingAgent:
         for i, item in enumerate(symbol_scores[:10], 1):  # Show top 10
             logger.info(f"{i}. {item['symbol']}: Score={item['score']:.2f}, Signal={item['signal'].value}")
         
-        # Step 3: Calculate current exposure
+        # Step 3: Check existing positions for sell signals and close them FIRST
+        sell_candidates = [item for item in symbol_scores if item['has_position'] and item['score'] < -20]
+        
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Executing Trades - Closing Positions First")
+        logger.info(f"{'='*80}")
+        
+        if sell_candidates:
+            logger.info(f"Closing {len(sell_candidates)} positions with weak signals:")
+            for item in sell_candidates:
+                logger.info(f"  - {item['symbol']}: Score={item['score']:.2f}")
+                self.execute_signal(item['symbol'], Signal.SELL, item['details'])
+        else:
+            logger.info("No positions to close")
+        
+        # Step 4: Calculate current exposure (after closing positions)
         current_exposure = sum(
             self.max_position_size for sym, pos in self.positions.items()
             if pos.get('has_position', False)
@@ -609,14 +660,14 @@ class QuantTradingAgent:
         available_exposure = max_total_exposure - current_exposure
         
         logger.info(f"\n{'='*80}")
-        logger.info(f"Portfolio Exposure")
+        logger.info(f"Portfolio Exposure (After Closures)")
         logger.info(f"{'='*80}")
         logger.info(f"Current Exposure: {current_exposure * 100:.1f}%")
         logger.info(f"Max Total Exposure: {max_total_exposure * 100:.1f}%")
         logger.info(f"Available Exposure: {available_exposure * 100:.1f}%")
         logger.info(f"Max Position Size: {self.max_position_size * 100:.1f}%")
         
-        # Step 4: Select top symbols to buy (limit to top 5 buy signals)
+        # Step 5: Select top symbols to buy (limit to top 5 buy signals)
         positions_to_open = []
         buy_candidates = [item for item in symbol_scores if item['score'] > 0 and not item['has_position']]
         
@@ -628,9 +679,9 @@ class QuantTradingAgent:
                 logger.info(f"Skipping {item['symbol']}: Insufficient exposure available")
                 break
         
-        # Step 5: Execute trades for selected symbols
+        # Step 6: Execute trades for selected symbols (open new positions)
         logger.info(f"\n{'='*80}")
-        logger.info(f"Executing Trades")
+        logger.info(f"Opening New Positions")
         logger.info(f"{'='*80}")
         
         if positions_to_open:
@@ -640,15 +691,6 @@ class QuantTradingAgent:
                 self.execute_signal(item['symbol'], Signal.BUY, item['details'])
         else:
             logger.info("No new positions to open")
-        
-        # Step 6: Check existing positions for sell signals
-        sell_candidates = [item for item in symbol_scores if item['has_position'] and item['score'] < -20]
-        
-        if sell_candidates:
-            logger.info(f"\nClosing {len(sell_candidates)} positions with weak signals:")
-            for item in sell_candidates:
-                logger.info(f"  - {item['symbol']}: Score={item['score']:.2f}")
-                self.execute_signal(item['symbol'], Signal.SELL, item['details'])
         
         logger.info(f"\n{'='*80}")
         logger.info(f"Analysis Cycle Completed")

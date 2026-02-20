@@ -31,6 +31,7 @@ class MovingAverageCrossoverStrategy(TradingStrategy):
         """Calculate MA crossover signals"""
         if not self.validate_data(data):
             return Signal.HOLD, {'error': 'Invalid data'}
+        self.long_window=len(data)
         
         # Calculate moving averages
         data['SMA_Short'] = data['Close'].rolling(window=self.short_window).mean()
