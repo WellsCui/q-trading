@@ -22,6 +22,7 @@ import json
 import yaml
 import logging
 import time
+import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
@@ -413,7 +414,19 @@ class QuantTradingAgent:
         if broker_type == 'ib' or broker_type == 'interactive_brokers':
             # Create Interactive Brokers connection
             try:
-                broker = IBBroker(self.config.get('broker', {}))
+                # Auto-generate unique client ID if not set or empty
+                broker_config = self.config.get('broker', {}).copy()
+                if not broker_config.get('ib_client_id') or broker_config.get('ib_client_id') == '':
+                    # Generate unique client ID: timestamp-based (last 3 digits of milliseconds) + random (1-999)
+                    timestamp_part = int(time.time() * 1000) % 1000
+                    random_part = random.randint(1, 999)
+                    generated_client_id = (timestamp_part + random_part) % 999 + 1  # Ensure range 1-999
+                    broker_config['ib_client_id'] = generated_client_id
+                    logger.info(f"Auto-generated IB client_id: {generated_client_id}")
+                else:
+                    logger.info(f"Using configured IB client_id: {broker_config.get('ib_client_id')}")
+                
+                broker = IBBroker(broker_config)
                 if broker.connect():
                     logger.info("Connected to Interactive Brokers")
                     return broker
