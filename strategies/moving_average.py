@@ -4,6 +4,7 @@ Moving Average Crossover Strategy
 
 from datetime import datetime
 from typing import Dict, Tuple, Any
+import logging
 import pandas as pd
 
 from .base import TradingStrategy, Signal
@@ -17,8 +18,8 @@ class MovingAverageCrossoverStrategy(TradingStrategy):
     Classic trend-following strategy.
     """
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
+        super().__init__(config, logger)
         self.short_window = config.get('short_window', 50)
         self.long_window = config.get('long_window', 120)
         self.price_threshold = config.get('price_threshold', 0.0)  # Additional price filter

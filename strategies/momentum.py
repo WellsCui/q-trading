@@ -4,6 +4,7 @@ Momentum Strategy based on RSI and Rate of Change
 
 from datetime import datetime
 from typing import Dict, Tuple, Any
+import logging
 import pandas as pd
 
 from .base import TradingStrategy, Signal
@@ -16,8 +17,8 @@ class MomentumStrategy(TradingStrategy):
     Buys on oversold conditions, sells on overbought conditions
     """
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
+        super().__init__(config, logger)
         self.rsi_period = config.get('rsi_period', 14)
         self.rsi_oversold = config.get('rsi_oversold', 30)
         self.rsi_overbought = config.get('rsi_overbought', 70)

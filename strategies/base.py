@@ -21,16 +21,17 @@ class Signal(Enum):
 class TradingStrategy(ABC):
     """Abstract base class for all trading strategies"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
         """
         Initialize strategy with configuration
         
         Args:
             config: Strategy-specific configuration parameters
+            logger: Optional logger instance (creates default if None)
         """
         self.config = config
         self.name = self.__class__.__name__
-        self.logger = logging.getLogger(f"Strategy.{self.name}")
+        self.logger = logger if logger is not None else logging.getLogger(f"Strategy.{self.name}")
         
     @abstractmethod
     def calculate_signals(self, data: pd.DataFrame, symbol: str) -> Tuple[Signal, Dict[str, Any]]:

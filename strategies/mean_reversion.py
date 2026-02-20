@@ -4,6 +4,7 @@ Mean Reversion Strategy using Bollinger Bands
 
 from datetime import datetime
 from typing import Dict, Tuple, Any
+import logging
 import pandas as pd
 
 from .base import TradingStrategy, Signal
@@ -16,8 +17,8 @@ class MeanReversionStrategy(TradingStrategy):
     Buys when price touches lower band, sells when price touches upper band
     """
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
+        super().__init__(config, logger)
         self.bb_period = config.get('bb_period', 20)
         self.bb_std = config.get('bb_std', 2.0)
         self.entry_threshold = config.get('entry_threshold', 0.02)  # 2% from band

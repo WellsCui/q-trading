@@ -4,6 +4,7 @@ Trend Following Strategy using ADX and Volume
 
 from datetime import datetime
 from typing import Dict, Tuple, Any
+import logging
 import pandas as pd
 import numpy as np
 
@@ -18,8 +19,8 @@ class TrendFollowingStrategy(TradingStrategy):
     - Volume for confirmation
     """
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
+        super().__init__(config, logger)
         self.ma_period = config.get('ma_period', 50)
         self.adx_period = config.get('adx_period', 14)
         self.adx_threshold = config.get('adx_threshold', 25)

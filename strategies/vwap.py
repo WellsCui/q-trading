@@ -9,6 +9,7 @@ This strategy identifies market imbalances by comparing price to VWAP:
 
 from datetime import datetime
 from typing import Dict, Tuple, Any
+import logging
 import pandas as pd
 import numpy as np
 
@@ -34,8 +35,8 @@ class VWAPStrategy(TradingStrategy):
     achieving 671% return vs 126% buy-and-hold over 2018-2023.
     """
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger = None):
+        super().__init__(config, logger)
         # VWAP calculation period (for daily data adaptation)
         self.vwap_period = config.get('vwap_period', 20)
         # Minimum distance from VWAP to generate signal (as percentage)
@@ -97,6 +98,9 @@ class VWAPStrategy(TradingStrategy):
         current_vwap = float(data['VWAP'].iloc[-1])
         prev_price = float(data['Close'].iloc[-2])
         prev_vwap = float(data['VWAP'].iloc[-2])
+        
+        # Log calculation details
+        self.logger.info(f"[{symbol}] Analyzing VWAP: Price=${current_price:.2f}, VWAP=${current_vwap:.2f}")
         
         # Check for NaN values
         if pd.isna(current_vwap) or pd.isna(prev_vwap):

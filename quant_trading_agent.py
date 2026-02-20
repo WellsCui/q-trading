@@ -26,11 +26,8 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
-from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
-import yfinance as yf
-import requests
 
 # Import broker interface
 from brokers.base_broker import BrokerInterface, MockBroker
@@ -47,6 +44,15 @@ from strategies import (
     VWAPStrategy
 )
 
+# Import data providers
+from data_providers import (
+    MarketDataProvider,
+    YFinanceProvider,
+    BrokerDataProvider,
+    TwelveDataProvider,
+    MultiProviderDataSource
+)
+
 # Configure logging
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -60,237 +66,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("QuantTradingAgent")
-
-
-class MarketDataProvider(ABC):
-    """Abstract base class for market data providers"""
-    
-    @abstractmethod
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical market data for a symbol"""
-        pass
-    
-    @abstractmethod
-    def is_available(self) -> bool:
-        """Check if provider is available"""
-        pass
-    
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Provider name"""
-        pass
-
-
-class YFinanceProvider(MarketDataProvider):
-    """Yahoo Finance data provider"""
-    
-    def __init__(self):
-        self._available = True
-    
-    @property
-    def name(self) -> str:
-        return "YFinance"
-    
-    def is_available(self) -> bool:
-        return self._available
-    
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical data from Yahoo Finance"""
-        try:
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            
-            logger.info(f"[YFinance] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
-            
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(start=start_date, end=end_date)
-            
-            if data.empty:
-                logger.error(f"[YFinance] No data received for {symbol}")
-                return None
-            
-            logger.info(f"[YFinance] Fetched {len(data)} days of data for {symbol}")
-            return data
-            
-        except Exception as e:
-            logger.error(f"[YFinance] Error fetching data for {symbol}: {e}")
-            self._available = False
-            return None
-
-
-class BrokerDataProvider(MarketDataProvider):
-    """Broker-based data provider (e.g., Interactive Brokers)"""
-    
-    def __init__(self, broker: Optional[BrokerInterface]):
-        self.broker = broker
-    
-    @property
-    def name(self) -> str:
-        return f"Broker ({type(self.broker).__name__ if self.broker else 'None'})"
-    
-    def is_available(self) -> bool:
-        return self.broker is not None and self.broker.is_connected()
-    
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical data from broker"""
-        if not self.is_available():
-            logger.warning(f"[Broker] Not connected, cannot fetch data for {symbol}")
-            return None
-        
-        try:
-            duration = kwargs.get('duration', f"{days} D")
-            bar_size = kwargs.get('bar_size', "1 D")
-            
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            
-            logger.info(f"[Broker] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
-            
-            data = self.broker.get_historical_data(symbol, duration=duration, bar_size=bar_size)
-            
-            if data is not None and not data.empty:
-                logger.info(f"[Broker] Fetched {len(data)} data points for {symbol}")
-                return data
-            else:
-                logger.warning(f"[Broker] No data received for {symbol}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"[Broker] Error fetching data for {symbol}: {e}")
-            return None
-
-
-class TwelveDataProvider(MarketDataProvider):
-    """Twelve Data API provider for market data"""
-    
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get('TWELVEDATA_API_KEY')
-        self._available = self.api_key is not None
-        self.base_url = "https://api.twelvedata.com"
-        
-        if not self._available:
-            logger.warning("[TwelveData] No API key provided. Set 'twelvedata_api_key' in config or TWELVEDATA_API_KEY environment variable.")
-    
-    @property
-    def name(self) -> str:
-        return "TwelveData"
-    
-    def is_available(self) -> bool:
-        return self._available
-    
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch historical data from Twelve Data API"""
-        if not self.is_available():
-            logger.warning(f"[TwelveData] API key not available, cannot fetch data for {symbol}")
-            return None
-        
-        try:
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            
-            logger.info(f"[TwelveData] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
-            
-            # Determine interval based on days requested
-            if days <= 30:
-                interval = "1day"
-                outputsize = days
-            elif days <= 365:
-                interval = "1day"
-                outputsize = min(days, 5000)  # API limit
-            else:
-                interval = "1week"
-                outputsize = min(days // 7, 5000)
-            
-            params = {
-                'symbol': symbol,
-                'interval': interval,
-                'outputsize': outputsize,
-                'apikey': self.api_key,
-                'format': 'JSON',
-                'start_date': start_date,
-                'end_date': end_date
-            }
-            
-            response = requests.get(f"{self.base_url}/time_series", params=params, timeout=10)
-            
-            if response.status_code != 200:
-                logger.error(f"[TwelveData] API request failed with status {response.status_code}: {response.text}")
-                return None
-            
-            data_json = response.json()
-            
-            # Check for API errors
-            if 'status' in data_json and data_json['status'] == 'error':
-                logger.error(f"[TwelveData] API error: {data_json.get('message', 'Unknown error')}")
-                return None
-            
-            if 'values' not in data_json or not data_json['values']:
-                logger.error(f"[TwelveData] No data received for {symbol}")
-                return None
-            
-            # Convert to DataFrame
-            df = pd.DataFrame(data_json['values'])
-            
-            # Convert column names to match yfinance format
-            df = df.rename(columns={
-                'datetime': 'Date',
-                'open': 'Open',
-                'high': 'High',
-                'low': 'Low',
-                'close': 'Close',
-                'volume': 'Volume'
-            })
-            
-            # Convert types
-            df['Date'] = pd.to_datetime(df['Date'])
-            df.set_index('Date', inplace=True)
-            df = df.sort_index()  # Sort by date ascending
-            
-            for col in ['Open', 'High', 'Low', 'Close']:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            if 'Volume' in df.columns:
-                df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0).astype(int)
-            
-            logger.info(f"[TwelveData] Fetched {len(df)} days of data for {symbol}")
-            return df
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"[TwelveData] Network error fetching data for {symbol}: {e}")
-            self._available = False
-            return None
-        except Exception as e:
-            logger.error(f"[TwelveData] Error fetching data for {symbol}: {e}")
-            return None
-
-
-class MultiProviderDataSource:
-    """Manages multiple data providers with fallback support"""
-    
-    def __init__(self, providers: List[MarketDataProvider]):
-        self.providers = providers
-        logger.info(f"Initialized data source with {len(providers)} providers: {[p.name for p in providers]}")
-    
-    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
-        """Fetch data from first available provider"""
-        for provider in self.providers:
-            if not provider.is_available():
-                logger.debug(f"Provider {provider.name} not available, trying next...")
-                continue
-            
-            logger.info(f"Attempting to fetch {symbol} data from {provider.name}")
-            data = provider.get_historical_data(symbol, days, **kwargs)
-            
-            if data is not None and not data.empty:
-                logger.info(f"Successfully fetched {symbol} data from {provider.name}")
-                return data
-            else:
-                logger.warning(f"Failed to fetch {symbol} data from {provider.name}, trying next provider")
-        
-        logger.error(f"All providers failed for {symbol}")
-        return None
 
 
 class QuantTradingAgent:
@@ -456,7 +231,9 @@ class QuantTradingAgent:
         
         for strategy_name, strategy_config in strategy_configs.items():
             if strategy_name in strategy_classes:
-                self.strategies[strategy_name] = strategy_classes[strategy_name](strategy_config)
+                # Create strategy-specific logger
+                strategy_logger = logging.getLogger(f"QuantTradingAgent.Strategy.{strategy_name}")
+                self.strategies[strategy_name] = strategy_classes[strategy_name](strategy_config, strategy_logger)
                 logger.info(f"Initialized strategy: {strategy_name}")
     
     def _create_data_source(self) -> MultiProviderDataSource:
