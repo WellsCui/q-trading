@@ -1,0 +1,177 @@
+# Quantitative Trading Agent Configuration
+# Configure trading strategies, symbols, and risk parameters
+
+symbols:
+  - QQQ
+  # - AAPL
+  # - MSFT
+  # - GOOG
+  # - AMZN
+  # - NVDA
+  # - META
+  # - TSLA
+  # - AVGO
+  # - COST
+  # - NFLX
+  # - AMD
+  # - PEP
+  # - ADBE
+  # - CSCO
+  # - TMUS
+  # - CMCSA
+  # - INTC
+  # - INTU
+  # - TXN
+  # - QCOM
+  # - AMGN
+  # - HON
+  # - AMAT
+  # - SBUX
+  # - ISRG
+  # - GILD
+  # - BKNG
+  # - VRTX
+  # - ADP
+  # - LRCX
+  # - MDLZ
+  # - REGN
+  # - ADI
+  # - MU
+  # - PYPL
+  # - PANW
+  # - KLAC
+  # - SNPS
+  # - CDNS
+  # - MELI
+  # - ASML
+  # - MAR
+  # - ABNB
+  # - CRWD
+  # - CHTR
+  # - NXPI
+  # - WDAY
+  # - MRNA
+  # - FTNT
+  # - MNST
+  # - ORLY
+  # - DXCM
+  # - LULU
+  # - CTAS
+  # - PAYX
+  # - AEP
+  # - PCAR
+  # - MCHP
+  # - IDXX
+  # - KDP
+  # - ROST
+  # - EA
+  # - CPRT
+  # - ODFL
+  # - CTSH
+  # - FAST
+  # - BKR
+  # - DDOG
+  # - TEAM
+  # - GEHC
+  # - VRSK
+  # - BIIB
+  # - ILMN
+  # - XEL
+  # - ANSS
+  # - EXC
+  # - KHC
+  # - DLTR
+  # - CSGP
+  # - FANG
+  # - ZS
+  # - ALGN
+  # - ON
+  # - WBD
+  # - ENPH
+  # - SIRI
+  # - MTCH
+  # - ZM
+  # - RIVN
+  # - LCID
+  # - TTD
+  # - DASH
+  # - COIN
+  # - SNOW
+  # - DKNG
+  # - OKTA
+  # - DOCU
+  # - NET
+  # - SPLK
+
+active_strategy: MovingAverageCrossover
+
+strategies:
+  MovingAverageCrossover:
+    # Classic moving average crossover strategy
+    short_window: 10
+    long_window: 25
+    price_threshold: 0.0
+  
+  Momentum:
+    # RSI and Rate of Change momentum strategy
+    rsi_period: 14
+    rsi_oversold: 30
+    rsi_overbought: 70
+    roc_period: 20
+  
+  MeanReversion:
+    # Bollinger Bands mean reversion strategy
+    bb_period: 20
+    bb_std: 2.0
+    entry_threshold: 0.02
+  
+  TrendFollowing:
+    # ADX-based trend following with volume confirmation
+    ma_period: 50
+    adx_period: 14
+    adx_threshold: 25
+    volume_ma_period: 20
+
+# Risk Management Parameters
+max_position_size: 0.2
+stop_loss_pct: 0.05
+take_profit_pct: 0.15
+max_total_exposure: 0.8
+
+# Trading Settings
+check_interval_minutes: 60
+dry_run: true
+data_lookback_days: 120
+trading_hours_only: true
+market_open_hour: 9
+market_close_hour: 16
+
+# Market Data Provider Configuration
+data_provider: twelvedata
+# Options: 'yfinance', 'broker', 'twelvedata', or 'auto' (tries multiple with fallback)
+data_provider_priority:
+  - twelvedata
+  - broker
+  - yfinance
+# Provider priority order when data_provider='auto'. First available provider will be used.
+# twelvedata_api_key: fake_api_key
+# Twelve Data API key (get free key at https://twelvedata.com/). Can also set TWELVEDATA_API_KEY env variable.
+
+# Broker Integration
+broker:
+  type: ib
+  # Broker type: 'mock' for testing, 'ib' for Interactive Brokers
+  total_capital: 100000
+  position_size_pct: 95
+  
+  # Interactive Brokers Settings (only used if type='ib')
+  ib_host: 127.0.0.1
+  ib_port: 7497
+  # 7497 for paper trading, 7496 for live trading
+  ib_client_id: 3
+  ib_account: ""
+
+# Notification Settings (Optional)
+enable_notifications: false
+notification_email: ""
+notification_webhook: ""

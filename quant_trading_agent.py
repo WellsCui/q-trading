@@ -19,6 +19,7 @@ Date: 2026-01-25
 import os
 import sys
 import json
+import yaml
 import logging
 import time
 from datetime import datetime, timedelta
@@ -28,6 +29,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import requests
 
 # Import broker interface
 from brokers.base_broker import BrokerInterface, MockBroker
@@ -157,6 +159,111 @@ class BrokerDataProvider(MarketDataProvider):
             return None
 
 
+class TwelveDataProvider(MarketDataProvider):
+    """Twelve Data API provider for market data"""
+    
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.environ.get('TWELVEDATA_API_KEY')
+        self._available = self.api_key is not None
+        self.base_url = "https://api.twelvedata.com"
+        
+        if not self._available:
+            logger.warning("[TwelveData] No API key provided. Set 'twelvedata_api_key' in config or TWELVEDATA_API_KEY environment variable.")
+    
+    @property
+    def name(self) -> str:
+        return "TwelveData"
+    
+    def is_available(self) -> bool:
+        return self._available
+    
+    def get_historical_data(self, symbol: str, days: int, **kwargs) -> Optional[pd.DataFrame]:
+        """Fetch historical data from Twelve Data API"""
+        if not self.is_available():
+            logger.warning(f"[TwelveData] API key not available, cannot fetch data for {symbol}")
+            return None
+        
+        try:
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            
+            logger.info(f"[TwelveData] Fetching {days} days of data for {symbol} ({start_date} to {end_date})")
+            
+            # Determine interval based on days requested
+            if days <= 30:
+                interval = "1day"
+                outputsize = days
+            elif days <= 365:
+                interval = "1day"
+                outputsize = min(days, 5000)  # API limit
+            else:
+                interval = "1week"
+                outputsize = min(days // 7, 5000)
+            
+            params = {
+                'symbol': symbol,
+                'interval': interval,
+                'outputsize': outputsize,
+                'apikey': self.api_key,
+                'format': 'JSON',
+                'start_date': start_date,
+                'end_date': end_date
+            }
+            
+            response = requests.get(f"{self.base_url}/time_series", params=params, timeout=10)
+            
+            if response.status_code != 200:
+                logger.error(f"[TwelveData] API request failed with status {response.status_code}: {response.text}")
+                return None
+            
+            data_json = response.json()
+            
+            # Check for API errors
+            if 'status' in data_json and data_json['status'] == 'error':
+                logger.error(f"[TwelveData] API error: {data_json.get('message', 'Unknown error')}")
+                return None
+            
+            if 'values' not in data_json or not data_json['values']:
+                logger.error(f"[TwelveData] No data received for {symbol}")
+                return None
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(data_json['values'])
+            
+            # Convert column names to match yfinance format
+            df = df.rename(columns={
+                'datetime': 'Date',
+                'open': 'Open',
+                'high': 'High',
+                'low': 'Low',
+                'close': 'Close',
+                'volume': 'Volume'
+            })
+            
+            # Convert types
+            df['Date'] = pd.to_datetime(df['Date'])
+            df.set_index('Date', inplace=True)
+            df = df.sort_index()  # Sort by date ascending
+            
+            for col in ['Open', 'High', 'Low', 'Close']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            if 'Volume' in df.columns:
+                df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0).astype(int)
+            
+            logger.info(f"[TwelveData] Fetched {len(df)} days of data for {symbol}")
+            return df
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[TwelveData] Network error fetching data for {symbol}: {e}")
+            self._available = False
+            return None
+        except Exception as e:
+            logger.error(f"[TwelveData] Error fetching data for {symbol}: {e}")
+            return None
+
+
 class MultiProviderDataSource:
     """Manages multiple data providers with fallback support"""
     
@@ -189,7 +296,7 @@ class QuantTradingAgent:
     Main Quantitative Trading Agent that coordinates strategies and manages positions
     """
     
-    def __init__(self, config_path: str = "quant_config.json", broker: Optional[BrokerInterface] = None):
+    def __init__(self, config_path: str = "quant_config.yaml", broker: Optional[BrokerInterface] = None):
         """
         Initialize the quantitative trading agent
         
@@ -243,16 +350,19 @@ class QuantTradingAgent:
         logger.info("=" * 80)
     
     def _load_config(self, config_path: str) -> Dict:
-        """Load configuration from JSON file"""
+        """Load configuration from JSON or YAML file"""
         try:
             with open(config_path, 'r') as f:
-                config = json.load(f)
+                if config_path.endswith(('.yaml', '.yml')):
+                    config = yaml.safe_load(f)
+                else:
+                    config = json.load(f)
             logger.info(f"Configuration loaded from {config_path}")
             return config
         except FileNotFoundError:
             logger.warning(f"Config file {config_path} not found, using defaults")
             return self._get_default_config()
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
             logger.error(f"Error parsing config file: {e}")
             return self._get_default_config()
     
@@ -368,6 +478,9 @@ class QuantTradingAgent:
             return YFinanceProvider()
         elif provider_name == 'broker':
             return BrokerDataProvider(self.broker)
+        elif provider_name == 'twelvedata':
+            api_key = self.config.get('twelvedata_api_key')
+            return TwelveDataProvider(api_key)
         else:
             logger.warning(f"Unknown data provider: {provider_name}")
             return None
@@ -812,7 +925,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Quantitative Trading Agent')
-    parser.add_argument('--config', type=str, default='quant_config.json',
+    parser.add_argument('--config', type=str, default='quant_config.yaml',
                        help='Path to configuration file')
     parser.add_argument('--once', action='store_true',
                        help='Run once and exit (no loop)')

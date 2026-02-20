@@ -99,7 +99,7 @@ Edit `config.json`:
 Test the connection before running the bot:
 
 ```python
-python3 -c "from ib_broker import create_ib_broker; import json; config = json.load(open('config.json')); broker = create_ib_broker(config); print('Connected!' if broker else 'Failed')"
+python3 -c "from brokers import create_ib_broker; import json; config = json.load(open('config.json')); broker = create_ib_broker(config); print('Connected!' if broker else 'Failed')"
 ```
 
 ### 3. Start the Trading Bot

@@ -193,7 +193,7 @@ def main():
     print("\n✅ Test suite finished successfully!")
     print("\nNext steps:")
     print("1. Review the test results above")
-    print("2. Configure quant_config.json for your needs")
+    print("2. Configure quant_config.yaml for your needs")
     print("3. Run: python quant_trading_agent.py --once")
     print("4. Monitor logs in the logs/ directory")
 

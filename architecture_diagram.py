@@ -64,7 +64,7 @@ WORKFLOW = """
 
 1. INITIALIZATION
    ┌──────────────────────────────────────────┐
-   │ Load Config (quant_config.json)          │
+   │ Load Config (quant_config.yaml)          │
    └──────────────┬───────────────────────────┘
                   │
                   ▼

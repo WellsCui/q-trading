@@ -42,7 +42,7 @@ Successfully implemented a comprehensive broker interface and integrated it with
 3. **[brokers/__init__.py](brokers/__init__.py)**
    - Added exports for `BrokerInterface` and `MockBroker`
 
-4. **[quant_config.json](quant_config.json)**
+4. **[quant_config.yaml](quant_config.yaml)**
    - Updated broker configuration structure
    - Added detailed comments for broker settings
 
@@ -66,10 +66,10 @@ The QuantTradingAgent accepts a broker instance via constructor injection:
 ```python
 # Explicit injection
 broker = IBBroker(config)
-agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
 
 # Auto-creation from config
-agent = QuantTradingAgent(config_path='quant_config.json')
+agent = QuantTradingAgent(config_path='quant_config.yaml')
 ```
 
 ### 3. Multiple Broker Support
@@ -123,7 +123,7 @@ if broker.connect():
 
 ```python
 # Just load config, agent creates the right broker
-agent = QuantTradingAgent(config_path='quant_config.json')
+agent = QuantTradingAgent(config_path='quant_config.yaml')
 agent.run()
 ```
 
@@ -142,20 +142,17 @@ This tests:
 
 ## Configuration
 
-In `quant_config.json`:
+In `quant_config.yaml`:
 
-```json
-{
-  "broker": {
-    "type": "mock",
-    "total_capital": 100000,
-    "position_size_pct": 95,
-    
-    "ib_host": "127.0.0.1",
-    "ib_port": 7497,
-    "ib_client_id": 3
-  }
-}
+```yaml
+broker:
+  type: mock
+  total_capital: 100000
+  position_size_pct: 95
+  
+  ib_host: 127.0.0.1
+  ib_port: 7497
+  ib_client_id: 3
 ```
 
 Set `"type": "ib"` to use Interactive Brokers.
@@ -173,7 +170,7 @@ Set `"type": "ib"` to use Interactive Brokers.
 
 To use this in production:
 
-1. Configure Interactive Brokers settings in `quant_config.json`
+1. Configure Interactive Brokers settings in `quant_config.yaml`
 2. Start TWS or IB Gateway
 3. Test with paper trading (port 7497)
 4. Verify all trades are executed correctly

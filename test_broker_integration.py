@@ -10,6 +10,7 @@ This script demonstrates how to:
 
 import sys
 import json
+import yaml
 from pathlib import Path
 
 # Add project root to path
@@ -40,7 +41,7 @@ def test_mock_broker():
         print(f"  Buying Power: ${broker.get_buying_power():,.2f}")
     
     # Create agent with broker
-    agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+    agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
     
     # Get status
     status = agent.get_status()
@@ -74,14 +75,14 @@ def test_ib_broker():
     
     # Load IB configuration
     try:
-        with open('quant_config.json', 'r') as f:
-            config_data = json.load(f)
+        with open('quant_config.yaml', 'r') as f:
+            config_data = yaml.safe_load(f)
         
         broker_config = config_data.get('broker', {})
         
         # Only test if IB is configured
         if broker_config.get('type') != 'ib':
-            print("⚠ IBBroker not configured in quant_config.json (broker.type != 'ib')")
+            print("⚠ IBBroker not configured in quant_config.yaml (broker.type != 'ib')")
             print("  Skipping IB test")
             return
         
@@ -96,7 +97,7 @@ def test_ib_broker():
             print(f"  Buying Power: ${broker.get_buying_power():,.2f}")
             
             # Create agent with IB broker
-            agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+            agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
             
             # Get status
             status = agent.get_status()
@@ -114,7 +115,7 @@ def test_ib_broker():
             print("  Make sure TWS/IB Gateway is running and configured correctly")
             
     except FileNotFoundError:
-        print("✗ quant_config.json not found")
+        print("✗ quant_config.yaml not found")
     except Exception as e:
         print(f"✗ Error testing IB broker: {e}")
 
@@ -126,7 +127,7 @@ def test_agent_without_broker():
     print("=" * 80)
     
     # Create agent without providing broker - it will create one from config
-    agent = QuantTradingAgent(config_path='quant_config.json')
+    agent = QuantTradingAgent(config_path='quant_config.yaml')
     
     status = agent.get_status()
     print(f"✓ Agent created with auto-initialized broker:")

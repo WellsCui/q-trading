@@ -62,9 +62,11 @@
   
   "_comment_data": "Market Data Provider Configuration",
   "data_provider": "auto",
-  "_comment_provider": "Options: 'yfinance', 'broker', or 'auto' (tries multiple with fallback)",
+  "_comment_provider": "Options: 'yfinance', 'broker', 'twelvedata', or 'auto' (tries multiple with fallback)",
   "data_provider_priority": ["broker", "yfinance"],
   "_comment_priority": "Provider priority order when data_provider='auto'. First available provider will be used.",
+  "twelvedata_api_key": null,
+  "_comment_twelvedata": "Twelve Data API key (get free key at https://twelvedata.com/). Can also set TWELVEDATA_API_KEY env variable.",
   
   "_comment_broker": "Broker Integration",
   "broker": {

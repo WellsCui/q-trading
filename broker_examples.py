@@ -19,8 +19,8 @@ def example_1_auto_broker():
     from quant_trading_agent import QuantTradingAgent
     
     # Simple - just provide config path
-    # Agent reads broker config from quant_config.json
-    agent = QuantTradingAgent(config_path='quant_config.json')
+    # Agent reads broker config from quant_config.yaml
+    agent = QuantTradingAgent(config_path='quant_config.yaml')
     
     # Check what broker was created
     status = agent.get_status()
@@ -59,7 +59,7 @@ def example_2_mock_broker():
     print(f"  Buying Power: ${broker.get_buying_power():,.2f}")
     
     # Inject broker into agent
-    agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+    agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
     
     # Simulate some trades
     print("\n✓ Placing test trades...")
@@ -122,7 +122,7 @@ def example_3_ib_broker():
                 print(f"  {symbol}: {pos.get('position', 0):.0f} shares")
             
             # Create agent with IB broker
-            agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+            agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
             
             print(f"\n✓ Agent Status:")
             status = agent.get_status()
@@ -164,7 +164,7 @@ def example_4_switching_brokers():
     mock_broker = MockBroker({'total_capital': 100000})
     mock_broker.connect()
     
-    agent = QuantTradingAgent(config_path='quant_config.json', broker=mock_broker)
+    agent = QuantTradingAgent(config_path='quant_config.yaml', broker=mock_broker)
     agent.run_analysis_cycle()
     
     mock_metrics = mock_broker.get_performance_metrics()
@@ -191,7 +191,7 @@ def example_4_switching_brokers():
             print("✓ Connected to IB - ready for live trading")
             
             # Create new agent with IB broker
-            agent = QuantTradingAgent(config_path='quant_config.json', broker=ib_broker)
+            agent = QuantTradingAgent(config_path='quant_config.yaml', broker=ib_broker)
             
             # Could run live trading here
             # agent.run()

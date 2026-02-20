@@ -29,8 +29,8 @@ The simplest way is to let the agent create the broker from config:
 ```python
 from quant_trading_agent import QuantTradingAgent
 
-# Agent will create broker based on quant_config.json
-agent = QuantTradingAgent(config_path='quant_config.json')
+# Agent will create broker based on quant_config.yaml
+agent = QuantTradingAgent(config_path='quant_config.yaml')
 
 # Run the agent
 agent.run()
@@ -63,27 +63,24 @@ broker = IBBroker({
 broker.connect()
 
 # Create agent with broker
-agent = QuantTradingAgent(config_path='quant_config.json', broker=broker)
+agent = QuantTradingAgent(config_path='quant_config.yaml', broker=broker)
 agent.run()
 ```
 
 ## Configuration
 
-### quant_config.json
+### quant_config.yaml
 
-```json
-{
-  "broker": {
-    "type": "mock",
-    "total_capital": 100000,
-    "position_size_pct": 95,
-    
-    "ib_host": "127.0.0.1",
-    "ib_port": 7497,
-    "ib_client_id": 3,
-    "ib_account": ""
-  }
-}
+```yaml
+broker:
+  type: mock
+  total_capital: 100000
+  position_size_pct: 95
+  
+  ib_host: 127.0.0.1
+  ib_port: 7497
+  ib_client_id: 3
+  ib_account: ""
 ```
 
 **Broker Types:**
@@ -264,7 +261,7 @@ if not broker.connect():
 
 # 2. Create agent with broker
 agent = QuantTradingAgent(
-    config_path='quant_config.json',
+    config_path='quant_config.yaml',
     broker=broker
 )
 

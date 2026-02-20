@@ -61,15 +61,16 @@ pip install ibapi
 
 ### 1. Configure Your Settings
 
-Edit `quant_config.json`:
+Edit `quant_config.yaml`:
 
-```json
-{
-  "symbols": ["SPY", "QQQ", "AAPL"],
-  "active_strategy": "MovingAverageCrossover",
-  "dry_run": true,
-  "check_interval_minutes": 60
-}
+```yaml
+symbols:
+  - SPY
+  - QQQ
+  - AAPL
+active_strategy: MovingAverageCrossover
+dry_run: true
+check_interval_minutes: 60
 ```
 
 ### 2. Run the Agent
@@ -231,7 +232,7 @@ python quant_trading_agent.py --config my_config.json
 from quant_trading_agent import QuantTradingAgent, Signal
 
 # Create agent
-agent = QuantTradingAgent(config_path='quant_config.json')
+agent = QuantTradingAgent(config_path='quant_config.yaml')
 
 # Analyze a single symbol
 signal, details = agent.analyze_symbol('SPY', strategy_name='Momentum')
