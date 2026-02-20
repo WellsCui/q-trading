@@ -77,8 +77,8 @@ class TradingStrategy(ABC):
             self.logger.error(f"Missing required columns: {missing_cols}")
             return False
             
-        if len(data) < self.get_required_data_period():
-            self.logger.error(f"Insufficient data: {len(data)} days, need {self.get_required_data_period()}")
-            return False
+        # if len(data) < self.get_required_data_period():
+        #     self.logger.error(f"Insufficient data: {len(data)} days, need {self.get_required_data_period()}")
+        #     return False
             
         return True

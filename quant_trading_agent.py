@@ -42,7 +42,8 @@ from strategies import (
     MovingAverageCrossoverStrategy,
     MomentumStrategy,
     MeanReversionStrategy,
-    TrendFollowingStrategy
+    TrendFollowingStrategy,
+    VWAPStrategy
 )
 
 # Configure logging
@@ -437,6 +438,7 @@ class QuantTradingAgent:
             'Momentum': MomentumStrategy,
             'MeanReversion': MeanReversionStrategy,
             'TrendFollowing': TrendFollowingStrategy,
+            'VWAP': VWAPStrategy,
         }
         
         for strategy_name, strategy_config in strategy_configs.items():

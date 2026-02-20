@@ -103,9 +103,16 @@ symbols:
   # - NET
   # - SPLK
 
-active_strategy: MovingAverageCrossover
+active_strategy: VWAP
 
 strategies:
+  VWAP:
+    # Volume Weighted Average Price strategy
+    # Based on "The Holy Grail for Day Trading Systems" (Zarattini & Aziz, 2023)
+    vwap_period: 20
+    min_distance_pct: 0.1
+    intraday_mode: false
+  
   MovingAverageCrossover:
     # Classic moving average crossover strategy
     short_window: 30
