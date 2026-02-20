@@ -26,7 +26,7 @@ python quant_trading_agent.py
 ```
 q-trading/
 ├── quant_trading_agent.py      # Main agent
-├── quant_config.json            # Configuration
+├── quant_config.yaml            # Configuration
 ├── test_quant_agent.py          # Test suite
 ├── strategies/                  # Strategy modules (organized!)
 │   ├── __init__.py             # Package initialization
@@ -50,35 +50,39 @@ q-trading/
 ## 🎯 Common Configurations
 
 ### Conservative Setup (Low Risk)
-```json
-{
-  "symbols": ["SPY", "QQQ"],
-  "active_strategy": "MovingAverageCrossover",
-  "max_position_size": 0.15,
-  "stop_loss_pct": 0.03,
-  "take_profit_pct": 0.10
-}
+```yaml
+symbols:
+  - SPY
+  - QQQ
+active_strategy: MovingAverageCrossover
+max_position_size: 0.15
+stop_loss_pct: 0.03
+take_profit_pct: 0.10
 ```
 
 ### Aggressive Setup (High Risk/Reward)
-```json
-{
-  "symbols": ["QQQ", "TQQQ", "SQQQ"],
-  "active_strategy": "Momentum",
-  "max_position_size": 0.30,
-  "stop_loss_pct": 0.08,
-  "take_profit_pct": 0.25
-}
+```yaml
+symbols:
+  - QQQ
+  - TQQQ
+  - SQQQ
+active_strategy: Momentum
+max_position_size: 0.30
+stop_loss_pct: 0.08
+take_profit_pct: 0.25
 ```
 
 ### Diversified Multi-Strategy
-```json
-{
-  "symbols": ["SPY", "QQQ", "IWM", "DIA", "TLT"],
-  "active_strategy": "TrendFollowing",
-  "max_position_size": 0.20,
-  "check_interval_minutes": 30
-}
+```yaml
+symbols:
+  - SPY
+  - QQQ
+  - IWM
+  - DIA
+  - TLT
+active_strategy: TrendFollowing
+max_position_size: 0.20
+check_interval_minutes: 30
 ```
 
 ## ⚙️ Strategy Parameters Cheat Sheet
@@ -103,10 +107,10 @@ q-trading/
 ### Workflow 1: Test New Strategy
 ```bash
 # 1. Edit config
-nano quant_config.json
+nano quant_config.yaml
 
 # 2. Change active_strategy
-"active_strategy": "Momentum"
+active_strategy: Momentum
 
 # 3. Run once
 python quant_trading_agent.py --once
@@ -249,7 +253,7 @@ Minimal working config:
 ## 🔗 Quick Links
 
 - Main Agent: `quant_trading_agent.py`
-- Configuration: `quant_config.json`
+- Configuration: `quant_config.yaml`
 - Test Suite: `test_quant_agent.py`
 - Strategies: `strategies/` folder
 - Full Documentation: `QUANT_AGENT_README.md`

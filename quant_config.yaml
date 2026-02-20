@@ -108,8 +108,8 @@ active_strategy: MovingAverageCrossover
 strategies:
   MovingAverageCrossover:
     # Classic moving average crossover strategy
-    short_window: 10
-    long_window: 25
+    short_window: 30
+    long_window: 200
     price_threshold: 0.0
   
   Momentum:

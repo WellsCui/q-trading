@@ -446,8 +446,8 @@ class QuantTradingAgent:
     
     def _create_data_source(self) -> MultiProviderDataSource:
         """Create market data source with configured providers"""
-        data_provider_config = self.config.get('data_provider', 'yfinance')
-        provider_priority = self.config.get('data_provider_priority', ['yfinance'])
+        data_provider_config = self.config.get('data_provider', 'twelvedata')
+        provider_priority = self.config.get('data_provider_priority', ['twelvedata'])
         
         providers = []
         
