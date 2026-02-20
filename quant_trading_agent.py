@@ -347,9 +347,9 @@ class QuantTradingAgent:
             return None
         
         strategy = self.strategies[strategy_name]
-        
+        analysis_interval = self.config.get('analysis_interval', '5m')
         # Fetch market data
-        data = self.fetch_market_data(symbol, days=strategy.get_required_data_period(), interval='5m')
+        data = self.fetch_market_data(symbol, days=strategy.get_required_data_period(), interval=analysis_interval)
         if data is None:
             return None
         
@@ -423,12 +423,13 @@ class QuantTradingAgent:
     def _open_position(self, symbol: str, details: Dict):
         """Open a new position"""
         current_price = details.get('price', 0)
+        limit_price = current_price + 0.01
         
         if self.dry_run:
-            logger.info(f"DRY RUN: Opening position in {symbol} @ ${current_price:.2f}")
+            logger.info(f"DRY RUN: Opening position in {symbol} @ ${current_price:.2f} (Limit: ${limit_price:.2f})")
             quantity = 100  # Mock quantity
         else:
-            logger.info(f"LIVE: Opening position in {symbol} @ ${current_price:.2f}")
+            logger.info(f"LIVE: Opening position in {symbol} @ ${current_price:.2f} (Limit: ${limit_price:.2f})")
             
             # Use broker to calculate shares and place order
             if self.broker and self.broker.is_connected():
@@ -442,13 +443,13 @@ class QuantTradingAgent:
                         logger.error(f"Order validation failed: {error_msg}")
                         return
                     
-                    # Place order
-                    order_id = self.broker.place_order(symbol, 'BUY', quantity)
+                    # Place limit order at current_price + 0.01
+                    order_id = self.broker.place_order(symbol, 'BUY', quantity, order_type="LMT", limit_price=limit_price)
                     if order_id is None:
                         logger.error(f"Failed to place order for {symbol}")
                         return
                     
-                    logger.info(f"Order placed successfully: Order ID {order_id}")
+                    logger.info(f"Limit order placed successfully: Order ID {order_id} @ ${limit_price:.2f}")
                 except Exception as e:
                     logger.error(f"Error placing order: {e}", exc_info=True)
                     return
@@ -544,11 +545,36 @@ class QuantTradingAgent:
         with open(trade_log_path, 'w') as f:
             json.dump(trades, f, indent=2)
     
-    def run_analysis_cycle(self):
-        """Run one complete analysis cycle for all symbols"""
-        logger.info(f"\n{'='*80}")
-        logger.info(f"Analysis Cycle Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        logger.info(f"{'='*80}")
+    def refresh_and_display_portfolio_status(self) -> List[str]:
+        """Refresh positions from broker and display current portfolio status
+        
+        Returns:
+            List of symbols with active positions
+        """
+        # Refresh positions from broker if connected
+        if self.broker and self.broker.is_connected():
+            try:
+                broker_positions = self.broker.get_all_positions()
+                logger.debug(f"Refreshed positions from broker: {broker_positions}")
+                
+                # Update self.positions with current broker state
+                for symbol in self.positions.keys():
+                    broker_pos = next((p for p in broker_positions if p['symbol'] == symbol), None)
+                    if broker_pos:
+                        self.positions[symbol]['has_position'] = True
+                        self.positions[symbol]['quantity'] = broker_pos.get('quantity', 0)
+                        if 'avg_cost' in broker_pos:
+                            self.positions[symbol]['entry_price'] = broker_pos['avg_cost']
+                    else:
+                        # Symbol not in broker positions anymore
+                        self.positions[symbol]['has_position'] = False
+                        self.positions[symbol]['quantity'] = 0
+                        
+            except Exception as e:
+                logger.warning(f"Could not refresh positions from broker: {e}")
+        
+        # Collect active position symbols
+        active_position_symbols = []
         
         # Print current positions
         logger.info(f"\n{'='*80}")
@@ -563,6 +589,7 @@ class QuantTradingAgent:
                     quantity = position.get('quantity', 0)
                     strategy = position.get('strategy', 'Unknown')
                     logger.info(f"  {symbol}: Entry=${entry_price:.2f}, Qty={quantity}, Strategy={strategy}, Time={entry_time}")
+                    active_position_symbols.append(symbol)
             else:
                 logger.info("  No active positions")
         else:
@@ -585,10 +612,33 @@ class QuantTradingAgent:
         else:
             logger.info("  Broker not connected - cannot fetch orders")
         
+        return active_position_symbols
+    
+    def run_analysis_cycle(self):
+        """Run one complete analysis cycle for all symbols"""
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Analysis Cycle Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"{'='*80}")
+        
+        # Refresh and display portfolio status, get current position symbols
+        current_position_symbols = self.refresh_and_display_portfolio_status()
+        
+        # Merge configured symbols with current position symbols
+        # This ensures we always analyze symbols we have positions in
+        symbols_to_analyze = list(set(self.symbols + current_position_symbols))
+        
+        if current_position_symbols:
+            logger.info(f"\n{'='*80}")
+            logger.info(f"Symbols to Analyze: {len(symbols_to_analyze)}")
+            logger.info(f"{'='*80}")
+            logger.info(f"Configured symbols: {self.symbols}")
+            logger.info(f"Current positions: {current_position_symbols}")
+            logger.info(f"Combined list: {symbols_to_analyze}")
+        
         # Step 1: Analyze all symbols and collect scores
         symbol_scores = []
         
-        for symbol in self.symbols:
+        for symbol in symbols_to_analyze:
             try:
                 strategy_name = self.config.get('active_strategy', 'MovingAverageCrossover')
                 logger.info(f"\nAnalyzing {symbol} using {strategy_name} strategy...")
