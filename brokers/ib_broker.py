@@ -756,6 +756,8 @@ class IBBroker(BrokerInterface):
         order.orderType = "MKT"
         order.totalQuantity = quantity
         order.tif = "DAY"  # Time in force: Day order
+        order.eTradeOnly = False  # Disable unsupported attribute
+        order.firmQuoteOnly = False  # Disable unsupported attribute
         return order
     
     def create_limit_order(self, action: str, quantity: int, limit_price: float) -> Order:
@@ -766,6 +768,8 @@ class IBBroker(BrokerInterface):
         order.totalQuantity = quantity
         order.lmtPrice = limit_price
         order.tif = "DAY"
+        order.eTradeOnly = False  # Disable unsupported attribute
+        order.firmQuoteOnly = False  # Disable unsupported attribute
         return order
     
     def create_stop_order(self, action: str, quantity: int, stop_price: float) -> Order:
@@ -776,6 +780,8 @@ class IBBroker(BrokerInterface):
         order.totalQuantity = quantity
         order.auxPrice = stop_price
         order.tif = "DAY"
+        order.eTradeOnly = False  # Disable unsupported attribute
+        order.firmQuoteOnly = False  # Disable unsupported attribute
         return order
     
     def create_stop_limit_order(self, action: str, quantity: int, stop_price: float, limit_price: float) -> Order:
@@ -787,6 +793,8 @@ class IBBroker(BrokerInterface):
         order.auxPrice = stop_price
         order.lmtPrice = limit_price
         order.tif = "DAY"
+        order.eTradeOnly = False  # Disable unsupported attribute
+        order.firmQuoteOnly = False  # Disable unsupported attribute
         return order
     
     def create_bracket_order(self, action: str, quantity: int, limit_price: float, 
@@ -799,6 +807,8 @@ class IBBroker(BrokerInterface):
         parent.totalQuantity = quantity
         parent.lmtPrice = limit_price
         parent.tif = "DAY"
+        parent.eTradeOnly = False  # Disable unsupported attribute
+        parent.firmQuoteOnly = False  # Disable unsupported attribute
         parent.transmit = False
         parent.orderId = self.client.next_order_id
         
@@ -810,6 +820,8 @@ class IBBroker(BrokerInterface):
         take_profit_order.lmtPrice = take_profit
         take_profit_order.parentId = parent.orderId
         take_profit_order.tif = "DAY"
+        take_profit_order.eTradeOnly = False  # Disable unsupported attribute
+        take_profit_order.firmQuoteOnly = False  # Disable unsupported attribute
         take_profit_order.transmit = False
         take_profit_order.orderId = self.client.next_order_id + 1
         
@@ -821,6 +833,8 @@ class IBBroker(BrokerInterface):
         stop_loss_order.auxPrice = stop_loss
         stop_loss_order.parentId = parent.orderId
         stop_loss_order.tif = "DAY"
+        stop_loss_order.eTradeOnly = False  # Disable unsupported attribute
+        stop_loss_order.firmQuoteOnly = False  # Disable unsupported attribute
         stop_loss_order.transmit = True  # Last order transmits all
         stop_loss_order.orderId = self.client.next_order_id + 2
         

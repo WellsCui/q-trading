@@ -390,7 +390,7 @@ class QuantTradingAgent:
         
         return None
     
-    def execute_signal(self, symbol: str, signal: Signal, details: Dict):
+    def execute_signal(self, symbol: str, signal: Signal, details: Dict, position_value: Optional[float] = None):
         """
         Execute a trading signal
         
@@ -398,6 +398,7 @@ class QuantTradingAgent:
             symbol: Stock symbol
             signal: Trading signal
             details: Signal details
+            position_value: Target position value in dollars (optional, for custom position sizing)
         """
         logger.info("=" * 80)
         logger.info(f"SIGNAL: {symbol} - {signal.value}")
@@ -411,7 +412,7 @@ class QuantTradingAgent:
         
         if signal == Signal.BUY and not has_position:
             # Open long position
-            self._open_position(symbol, details)
+            self._open_position(symbol, details, position_value)
         elif signal == Signal.SELL and has_position:
             # Close position
             self._close_position(symbol, details)
@@ -420,14 +421,23 @@ class QuantTradingAgent:
         
         logger.info("=" * 80)
     
-    def _open_position(self, symbol: str, details: Dict):
-        """Open a new position"""
+    def _open_position(self, symbol: str, details: Dict, position_value: Optional[float] = None):
+        """Open a new position
+        
+        Args:
+            symbol: Stock symbol
+            details: Signal details
+            position_value: Target position value in dollars (optional). If provided, calculates shares
+                          based on this value instead of using broker's default position sizing.
+        """
         current_price = details.get('price', 0)
         limit_price = current_price + 0.01
         
         if self.dry_run:
             logger.info(f"DRY RUN: Opening position in {symbol} @ ${current_price:.2f} (Limit: ${limit_price:.2f})")
             quantity = 100  # Mock quantity
+            if position_value:
+                logger.info(f"  Target position value: ${position_value:,.2f}")
         else:
             logger.info(f"LIVE: Opening position in {symbol} @ ${current_price:.2f} (Limit: ${limit_price:.2f})")
             
@@ -435,7 +445,14 @@ class QuantTradingAgent:
             if self.broker and self.broker.is_connected():
                 try:
                     # Calculate position size
-                    quantity = self.broker.calculate_shares(symbol, current_price)
+                    if position_value is not None:
+                        # Use custom position value
+                        quantity = int(position_value / current_price)
+                        quantity = max(1, quantity)  # At least 1 share
+                        logger.info(f"  Target position value: ${position_value:,.2f} = {quantity} shares")
+                    else:
+                        # Use broker's default position sizing
+                        quantity = self.broker.calculate_shares(symbol, current_price)
                     
                     # Validate order
                     is_valid, error_msg = self.broker.validate_order(symbol, 'BUY', quantity)
@@ -545,13 +562,16 @@ class QuantTradingAgent:
         with open(trade_log_path, 'w') as f:
             json.dump(trades, f, indent=2)
     
-    def refresh_and_display_portfolio_status(self) -> List[str]:
+    def refresh_and_display_portfolio_status(self) -> Dict[str, Any]:
         """Refresh positions from broker and display current portfolio status
         
         Returns:
-            List of symbols with active positions
+            Dictionary with:
+                - 'symbols': List of symbols with active positions
+                - 'account_info': Dict with net_liquidation, cash_balance, buying_power
         """
         # Refresh positions from broker if connected
+        account_info = {}
         if self.broker and self.broker.is_connected():
             try:
                 broker_positions = self.broker.get_all_positions()
@@ -569,6 +589,37 @@ class QuantTradingAgent:
                         # Symbol not in broker positions anymore
                         self.positions[symbol]['has_position'] = False
                         self.positions[symbol]['quantity'] = 0
+                
+                # Fetch account information
+                try:
+                    net_liquidation = self.broker.get_account_value()
+                    cash_balance = self.broker.get_account_balance()
+                    buying_power = self.broker.get_buying_power()
+                    
+                    # Calculate total market value of positions
+                    total_position_value = 0.0
+                    for symbol, pos_data in broker_positions.items():
+                        try:
+                            quantity = pos_data.get('position', 0)
+                            if quantity != 0:
+                                # Get current market price
+                                market_data = self.broker.get_market_data(symbol)
+                                if market_data and market_data.get('close'):
+                                    current_price = market_data['close'][-1] if isinstance(market_data['close'], list) else market_data['close']
+                                    position_value = abs(quantity) * current_price
+                                    total_position_value += position_value
+                                    logger.debug(f"{symbol}: {quantity} shares @ ${current_price:.2f} = ${position_value:,.2f}")
+                        except Exception as e:
+                            logger.debug(f"Could not calculate position value for {symbol}: {e}")
+                    
+                    account_info = {
+                        'net_liquidation': net_liquidation,
+                        'cash_balance': cash_balance,
+                        'buying_power': buying_power,
+                        'total_position_value': total_position_value
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not fetch account information: {e}")
                         
             except Exception as e:
                 logger.warning(f"Could not refresh positions from broker: {e}")
@@ -595,6 +646,16 @@ class QuantTradingAgent:
         else:
             logger.info("  No active positions")
         
+        # Print account information
+        if account_info:
+            logger.info(f"\n{'='*80}")
+            logger.info("Account Information")
+            logger.info(f"{'='*80}")
+            logger.info(f"  Net Liquidation: ${account_info.get('net_liquidation', 0):,.2f}")
+            logger.info(f"  Cash Balance: ${account_info.get('cash_balance', 0):,.2f}")
+            logger.info(f"  Buying Power: ${account_info.get('buying_power', 0):,.2f}")
+            logger.info(f"  Total Position Value: ${account_info.get('total_position_value', 0):,.2f}")
+        
         # Print current orders from broker
         logger.info(f"\n{'='*80}")
         logger.info("Current Orders")
@@ -612,7 +673,10 @@ class QuantTradingAgent:
         else:
             logger.info("  Broker not connected - cannot fetch orders")
         
-        return active_position_symbols
+        return {
+            'symbols': active_position_symbols,
+            'account_info': account_info
+        }
     
     def run_analysis_cycle(self):
         """Run one complete analysis cycle for all symbols"""
@@ -621,7 +685,12 @@ class QuantTradingAgent:
         logger.info(f"{'='*80}")
         
         # Refresh and display portfolio status, get current position symbols
-        current_position_symbols = self.refresh_and_display_portfolio_status()
+        max_total_exposure = self.config.get('max_total_exposure', 0.8)
+        portfolio_status = self.refresh_and_display_portfolio_status()
+        current_position_symbols = portfolio_status.get('symbols', [])
+        account_info = portfolio_status.get('account_info', {})
+        cashBalance = account_info.get('cash_balance', 0)
+        available_buying_power = account_info.get('net_liquidation', 0) * max_total_exposure - account_info.get('total_position_value', 0)
         
         # Merge configured symbols with current position symbols
         # This ensures we always analyze symbols we have positions in
@@ -700,34 +769,45 @@ class QuantTradingAgent:
         else:
             logger.info("No positions to close")
         
-        # Step 4: Calculate current exposure (after closing positions)
-        current_exposure = sum(
-            self.max_position_size for sym, pos in self.positions.items()
-            if pos.get('has_position', False)
-        )
+        # Step 4: Recalculate available buying power after closures
+        available_buying_power = 0.0
+        if self.broker and self.broker.is_connected():
+            try:
+                # Refresh account info after closing positions
+                time.sleep(1)  # Brief pause to let broker update
+                updated_portfolio = self.broker.get_account_value()
+                available_buying_power = self.broker.get_buying_power()
+                
+                logger.info(f"\n{'='*80}")
+                logger.info(f"Available Capital (After Closures)")
+                logger.info(f"{'='*80}")
+                logger.info(f"Buying Power: ${available_buying_power:,.2f}")
+            except Exception as e:
+                logger.warning(f"Could not fetch buying power: {e}")
+                # Fallback: use initial calculation
+                available_buying_power = account_info.get('net_liquidation', 0) * max_total_exposure - account_info.get('total_position_value', 0)
+                logger.info(f"Using calculated buying power: ${available_buying_power:,.2f}")
+        else:
+            # Fallback: use initial calculation
+            available_buying_power = account_info.get('net_liquidation', 0) * max_total_exposure - account_info.get('total_position_value', 0)
+            logger.info(f"\n{'='*80}")
+            logger.info(f"Available Capital (After Closures)")
+            logger.info(f"{'='*80}")
+            logger.info(f"Calculated buying power: ${available_buying_power:,.2f}")
         
-        max_total_exposure = self.config.get('max_total_exposure', 0.8)
-        available_exposure = max_total_exposure - current_exposure
-        
-        logger.info(f"\n{'='*80}")
-        logger.info(f"Portfolio Exposure (After Closures)")
-        logger.info(f"{'='*80}")
-        logger.info(f"Current Exposure: {current_exposure * 100:.1f}%")
-        logger.info(f"Max Total Exposure: {max_total_exposure * 100:.1f}%")
-        logger.info(f"Available Exposure: {available_exposure * 100:.1f}%")
-        logger.info(f"Max Position Size: {self.max_position_size * 100:.1f}%")
-        
-        # Step 5: Select top symbols to buy (limit to top 5 buy signals)
-        positions_to_open = []
+        # Step 5: Select top symbols to buy and calculate position sizing
         buy_candidates = [item for item in symbol_scores if item['score'] > 0 and not item['has_position']]
+        max_positions = self.config.get('max_new_positions', 5)  # Limit to top N buy signals
         
-        for item in buy_candidates[:5]:  # Top 5 buy signals
-            if available_exposure >= self.max_position_size:
-                positions_to_open.append(item)
-                available_exposure -= self.max_position_size
-            else:
-                logger.info(f"Skipping {item['symbol']}: Insufficient exposure available")
-                break
+        positions_to_open = buy_candidates[:max_positions]
+        
+        # Calculate position value per symbol by splitting buying power evenly
+        position_value_each = None
+        if positions_to_open and available_buying_power > 0:
+            position_value_each = available_buying_power / len(positions_to_open)
+            logger.info(f"Position value per symbol: ${position_value_each:,.2f} ({len(positions_to_open)} positions)")
+        elif positions_to_open:
+            logger.info(f"No buying power available - using default position sizing")
         
         # Step 6: Execute trades for selected symbols (open new positions)
         logger.info(f"\n{'='*80}")
@@ -738,7 +818,7 @@ class QuantTradingAgent:
             logger.info(f"Opening {len(positions_to_open)} new positions:")
             for item in positions_to_open:
                 logger.info(f"  - {item['symbol']}: Score={item['score']:.2f}")
-                self.execute_signal(item['symbol'], Signal.BUY, item['details'])
+                self.execute_signal(item['symbol'], Signal.BUY, item['details'], position_value=position_value_each)
         else:
             logger.info("No new positions to open")
         
