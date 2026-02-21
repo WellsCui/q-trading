@@ -140,10 +140,10 @@ strategies:
     volume_ma_period: 20
 
 # Risk Management Parameters
-max_position_size: 0.2
+max_position_size: 0.02
 stop_loss_pct: 0.05
 take_profit_pct: 0.15
-max_total_exposure: 0.8
+max_total_exposure: 0.1
 
 # Trading Settings
 check_interval_minutes: 1
@@ -175,7 +175,7 @@ broker:
   ib_host: 127.0.0.1
   ib_port: 7497
   # 7497 for paper trading, 7496 for live trading
-  ib_client_id: "9"
+  ib_client_id: 12
   # Leave empty ("") to auto-generate a unique client ID on startup
   ib_account: ""
 
